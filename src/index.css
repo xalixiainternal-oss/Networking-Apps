@@ -1,0 +1,107 @@
+@import "tailwindcss";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
+
+/* ===== TOKEN: satu-satunya tempat hex ditulis ===== */
+:root {
+  --ink: #00033d;
+  --paper: #f2e6ee;
+  --pink: #ffccf2;
+  --lilac: #977dff;
+  --royal: #0033ff;
+  --deep: #0600ab;
+  --alert: #ff5a1f; /* HANYA untuk status kuota habis/terlampaui */
+
+  --grad-1: linear-gradient(180deg, #f2e6ee, #977dff);
+  --grad-2: linear-gradient(180deg, #ffccf2, #977dff, #0033ff);
+  --grad-3: linear-gradient(180deg, #977dff, #0033ff, #0600ab);
+  --grad-4: linear-gradient(180deg, #0033ff, #0600ab, #00033d);
+
+  /* peran semantik (berubah di tema gelap) */
+  --bg: var(--paper);
+  --surface: var(--paper);
+  --surface-2: var(--pink);
+  --text: var(--ink);
+  --border: var(--ink);
+  --shadow-color: var(--ink);
+
+  --bw: 3px;
+  --sh: 5px;
+  --radius: 8px;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --dur: 120ms;
+}
+:root[data-theme="dark"] {
+  --bg: var(--ink);
+  --surface: var(--deep);
+  --surface-2: var(--ink);
+  --text: var(--paper);
+  --border: var(--lilac);
+  --shadow-color: #000; /* bayangan keras gelap */
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-pink: var(--pink);
+  --color-lilac: var(--lilac);
+  --color-royal: var(--royal);
+  --color-deep: var(--deep);
+  --color-alert: var(--alert);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-text: var(--text);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--font-display); font-weight: 500;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== Komponen dasar neobrutalism ===== */
+.nb-box {
+  border: var(--bw) solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--sh) var(--sh) 0 var(--shadow-color);
+  background: var(--surface);
+  color: var(--text);
+}
+.nb-press {
+  transition: transform var(--dur) ease-out, box-shadow var(--dur) ease-out;
+  cursor: pointer; min-height: 48px; min-width: 48px;
+}
+.nb-press:active {
+  transform: translate(calc(var(--sh) - 1px), calc(var(--sh) - 1px));
+  box-shadow: 1px 1px 0 var(--shadow-color);
+}
+.nb-press:focus-visible { outline: 3px solid var(--lilac); outline-offset: 3px; }
+
+.nb-label { font-family: var(--font-mono); font-weight: 700; letter-spacing: .08em; font-size: .75rem; }
+.nb-num { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.grad-1 { background: var(--grad-1); }
+.grad-2 { background: var(--grad-2); }
+.grad-3 { background: var(--grad-3); }
+.grad-4 { background: var(--grad-4); color: var(--paper); } /* paper di atas royal→ink lolos 4.5:1 */
+
+/* Pola garis untuk batang grafik (tidak hanya bergantung pada warna) */
+.pat-cell { background-image: none; }
+.pat-wifi { background-image: repeating-linear-gradient(45deg, transparent 0 5px, var(--ink) 5px 7px); }
+.pat-hotspot { background-image: radial-gradient(var(--ink) 1.5px, transparent 1.6px); background-size: 7px 7px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+}
+.safe-top { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Lewati layout & gambar baris daftar yang di luar layar (daftar 300+ aplikasi) */
+.nb-row { content-visibility: auto; contain-intrinsic-size: auto 92px; }

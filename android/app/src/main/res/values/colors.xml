@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cermin token palet di src/index.css. Dipakai tema Android, splash, dan notifikasi. -->
+<resources>
+    <color name="colorPrimary">#0600AB</color>
+    <color name="colorPrimaryDark">#00033D</color>
+    <color name="colorAccent">#0033FF</color>
+    <color name="pk_royal">#0033FF</color>
+    <color name="pk_alert">#FF5A1F</color>
+</resources>
