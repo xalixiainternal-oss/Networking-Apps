@@ -71,17 +71,17 @@ jobs:
           mkdir -p out
           F=$(find android/app/build/outputs/apk -name '*.apk' | head -n1)
           S=debug; [ "${{ steps.ks.outputs.signed }}" = "true" ] && S=release
-          cp "$F" "out/pantau-kuota-v${{ steps.ver.outputs.name }}-$S.apk"
+          cp "$F" "out/xai-network-v${{ steps.ver.outputs.name }}-$S.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pantau-kuota-apk
+          name: xai-network-apk
           path: out/*.apk
 
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.name }}
-          name: Pantau Kuota v${{ steps.ver.outputs.name }}
+          name: Xai Network v${{ steps.ver.outputs.name }}
           files: out/*.apk
           prerelease: ${{ steps.ks.outputs.signed != 'true' }}

@@ -65,6 +65,11 @@ export function HotspotPage() {
           <p className="m-0 nb-num text-xl" aria-live="polite">
             {hs ? (hs.active ? `AKTIF · ${HOTSPOT_KIND_LABEL[hs.kind]}` : 'TIDAK TERDETEKSI') : 'MENGUKUR…'}
           </p>
+          {hs && !hs.active && (
+            <p className="mt-1 mb-0 text-xs opacity-70 break-words" style={{ fontFamily: 'var(--font-mono)' }}>
+              Antarmuka terbaca: {hs.debug ? hs.debug : 'tidak ada (Android menyembunyikannya)'}
+            </p>
+          )}
           <p className="mt-2 mb-3 text-sm opacity-80 leading-snug">
             Ini perkiraan dari antarmuka jaringan yang menyala, bukan jawaban resmi sistem (Android tidak menyediakannya untuk aplikasi biasa).
             Aplikasi ini <b>tidak bisa mematikan hotspot otomatis</b>: Android melarangnya. Saat batas tercapai, kamu hanya diberi notifikasi.

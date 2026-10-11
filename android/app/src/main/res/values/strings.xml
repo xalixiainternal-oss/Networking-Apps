@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Pantau Kuota</string>
-    <string name="title_activity_main">Pantau Kuota</string>
+    <string name="app_name">Xai Network</string>
+    <string name="title_activity_main">Xai Network</string>
     <string name="package_name">id.pantau.kuota</string>
     <string name="custom_url_scheme">id.pantau.kuota</string>
 </resources>

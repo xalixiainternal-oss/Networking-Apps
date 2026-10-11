@@ -7,6 +7,7 @@ import { describeRule } from '../lib/blocking';
 import { useApps, periodRange, loadIcon, useIconCache, unattributed, type Period, type SortKey, type NetFilter, type AppRow } from '../lib/appUsage';
 import { useSettings } from '../lib/settings';
 import { AppDetailPage } from './AppDetailPage';
+import { PageTransition } from './PageTransition';
 
 // ── Baris satu aplikasi ────────────────────────────────────────────────────
 function AppRowItem({ row, base, onClick }: { row: AppRow; base: 1000 | 1024; onClick(): void }) {
@@ -131,11 +132,13 @@ export function AppsPage() {
   }, [filtered.length, shown]);
 
   if (detail) return (
-    <AppDetailPage row={detail} range={range} onBack={() => setDetail(null)} />
+    <PageTransition pageKey="detail">
+      <AppDetailPage row={detail} range={range} onBack={() => setDetail(null)} />
+    </PageTransition>
   );
 
   return (
-    <>
+    <PageTransition pageKey="list">
       <Header title="Aplikasi" />
       <div className="p-4 grid gap-3">
 
@@ -263,7 +266,7 @@ export function AppsPage() {
           </div>
         )}
       </div>
-    </>
+    </PageTransition>
   );
 }
 

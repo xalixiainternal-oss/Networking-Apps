@@ -35,7 +35,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
   return (
     <main className="grad-3 min-h-full safe-top safe-bottom p-4 pb-10">
-      <Plate className="mt-4"><h1 className="text-3xl font-bold leading-tight m-0">Pantau Kuota</h1></Plate>
+      <Plate className="mt-4"><h1 className="text-3xl font-bold leading-tight m-0">Xai Network</h1></Plate>
       <Plate className="mt-3 block"><p className="m-0 font-bold">Data kamu tetap di HP ini. App tidak punya izin internet.</p></Plate>
 
       <div className="mt-6 grid gap-4">

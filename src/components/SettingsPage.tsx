@@ -46,7 +46,7 @@ function BlockSettings() {
           {vpn && vpn.running && <p className="m-0 nb-label">PAKET DIBUANG SEJAK LAYANAN MULAI: {vpn.dropped.toLocaleString('id-ID')}</p>}
           <Button variant="ghost" onClick={() => { void Quota.openVpnSettings(); }}>Buka pengaturan VPN sistem</Button>
           <p className="m-0 text-xs opacity-80">
-            Setelah HP restart, Android sering menolak layanan latar dimulai sendiri. Aktifkan <b>VPN selalu aktif</b> untuk Pantau Kuota di pengaturan VPN supaya pemblokiran langsung kembali.
+            Setelah HP restart, Android sering menolak layanan latar dimulai sendiri. Aktifkan <b>VPN selalu aktif</b> untuk Xai Network di pengaturan VPN supaya pemblokiran langsung kembali.
           </p>
           {rules.length > 0 ? (
             <ul className="m-0 p-0 list-none grid gap-2">

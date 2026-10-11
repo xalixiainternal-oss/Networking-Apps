@@ -1,4 +1,4 @@
-# Pantau Kuota
+# Xai Network
 
 Pemantau kuota & hotspot untuk Android. Data hanya di perangkat; app **tidak punya izin INTERNET**.
 Status: **v0.5** (blokir per aplikasi lewat VPN lokal). Batas kecepatan dan mode root/Shizuku (v0.6) belum ada.

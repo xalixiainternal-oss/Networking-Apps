@@ -37,7 +37,7 @@ export interface QuotaStatus {
   items: LimitItem[]; cycleStart: number; cycleEnd: number; dayStart: number; todayCell: number; todayWifi: number;
 }
 export interface TetherRow { t: number; net: 'cell' | 'wifi'; rx: number; tx: number }
-export interface HotspotState { active: boolean; kind: 'wifi' | 'usb' | 'bluetooth' | 'none'; iface: string }
+export interface HotspotState { active: boolean; kind: 'wifi' | 'usb' | 'bluetooth' | 'none'; iface: string; debug?: string }
 export interface Capabilities {
   sdk: number; mobileStats: boolean; foregroundSplit: boolean; tetherSeen: boolean; notifications: boolean;
 }

@@ -5,6 +5,7 @@ import { Dashboard } from './components/Dashboard';
 import { AppsPage } from './components/AppsPage';
 import { SettingsPage } from './components/SettingsPage';
 import { HotspotPage } from './components/HotspotPage';
+import { PageTransition } from './components/PageTransition';
 import { Quota } from './lib/quotaPlugin';
 import { applyTheme, useSettings } from './lib/settings';
 import { pushConfig } from './lib/nativeConfig';
@@ -42,10 +43,12 @@ export default function App() {
 
   return (
     <div className="min-h-full pb-28">
-      {tab === 'dashboard'  && <Dashboard onGoToApps={() => setTab('aplikasi')} />}
-      {tab === 'aplikasi'   && <AppsPage />}
-      {tab === 'hotspot'    && <HotspotPage />}
-      {tab === 'pengaturan' && <SettingsPage />}
+      <PageTransition pageKey={tab}>
+        {tab === 'dashboard'  && <Dashboard onGoToApps={() => setTab('aplikasi')} />}
+        {tab === 'aplikasi'   && <AppsPage />}
+        {tab === 'hotspot'    && <HotspotPage />}
+        {tab === 'pengaturan' && <SettingsPage />}
+      </PageTransition>
       <BottomTabs active={tab} onChange={setTab} />
     </div>
   );

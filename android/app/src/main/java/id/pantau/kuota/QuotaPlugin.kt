@@ -322,8 +322,8 @@ class QuotaPlugin : Plugin() {
     @PluginMethod
     fun getHotspotState(call: PluginCall) {
         io.launch {
-            val h = Hotspot.detect()
-            call.resolve(JSObject().put("active", h.active).put("kind", h.kind).put("iface", h.iface ?: ""))
+            val h = Hotspot.detect(context)
+            call.resolve(JSObject().put("active", h.active).put("kind", h.kind).put("iface", h.iface ?: "").put("debug", h.debug))
         }
     }
 
