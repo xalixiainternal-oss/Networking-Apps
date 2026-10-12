@@ -73,8 +73,15 @@ public class BlockPolicyTest {
 
     @Test public void paketSatuUidIkutMasukVpnBersamaPaketAturan() {
         Map<String, Set<String>> aliases = Collections.singletonMap("a", s("a", "a.shared"));
-        assertEquals(s("a", "a.shared"),
+        // hanya aturan "a" yang punya alias; aturan lain (c = background, d = seluler) tetap ikut terblokir
+        assertEquals(s("a", "a.shared", "c", "d"),
             BlockPolicy.blockedSet(rules, "cell", "x", true, none, 1000, "me", false, aliases));
+        // tanpa alias, "a.shared" tidak ikut
+        assertEquals(s("a", "c", "d"),
+            BlockPolicy.blockedSet(rules, "cell", "x", true, none, 1000, "me", false, null));
+        // aturan "a" tidak memblokir pada jaringan "other" -> alias-nya juga tidak ikut
+        assertEquals(s("c"),
+            BlockPolicy.blockedSet(rules, "other", "x", true, none, 1000, "me", false, aliases));
     }
 
     @Test public void jadwalMendukungLintasTengahMalamDenganAkhirEksklusif() {
