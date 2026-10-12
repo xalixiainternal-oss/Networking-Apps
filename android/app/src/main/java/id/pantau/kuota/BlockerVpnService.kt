@@ -14,7 +14,13 @@ import android.net.VpnService
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.util.Log
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.io.FileInputStream
 import java.util.concurrent.atomic.AtomicLong
 
@@ -33,15 +39,24 @@ import java.util.concurrent.atomic.AtomicLong
  * jadi aplikasi terlihat "menunggu"/timeout; deteksi aplikasi di layar memakai polling tiap ~2 detik.
  */
 class BlockerVpnService : VpnService() {
+    private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val handler = Handler(Looper.getMainLooper())
     private var tun: ParcelFileDescriptor? = null
     private var current: Set<String> = emptySet()
     private var net = "other"
     private var fg: String? = null
     private var screenOn = true
+    private var hotspotOn = false
     private var lastEventTs = 0L
     private var registered = false
     private var netCb: ConnectivityManager.NetworkCallback? = null
+    private var packageAliases: Map<String, Set<String>> = emptyMap()
+    @Volatile private var shizukuDesired: Set<String>? = null
+    @Volatile private var shizukuBusy = false
+    @Volatile private var shizukuApplied = false
+    @Volatile private var shizukuFailure = false
+    @Volatile private var shizukuGeneration = 0
+    @Volatile private var shizukuCleanupPending = false
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
@@ -55,10 +70,13 @@ class BlockerVpnService : VpnService() {
 
     private val tick = object : Runnable {
         override fun run() {
-            val needFg = screenOn && QuotaConfig.load(this@BlockerVpnService).blockRules.any { it.bg }
+            val rules = QuotaConfig.load(this@BlockerVpnService).blockRules
+            val needFg = screenOn && rules.any { it.bg }
+            val needHot = rules.any { it.hot }
+            if (needHot) pollHotspot() else hotspotOn = false
             if (needFg) pollForeground()
             recompute()
-            handler.postDelayed(this, if (needFg) 2_000L else 30_000L)
+            handler.postDelayed(this, if (needFg) 2_000L else if (needHot) 5_000L else 30_000L)
         }
     }
 
@@ -83,6 +101,7 @@ class BlockerVpnService : VpnService() {
         running = false
         blockedCount = 0
         handler.removeCallbacksAndMessages(null)
+        io.cancel()
         if (registered) {
             try { unregisterReceiver(receiver) } catch (e: Exception) { }
             try { netCb?.let { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) } } catch (e: Exception) { }
@@ -141,14 +160,121 @@ class BlockerVpnService : VpnService() {
         } catch (e: Exception) { /* tanpa Akses Penggunaan: dianggap tidak diketahui (semua background) */ }
     }
 
+    // ── hotspot/tethering menyala? (untuk aturan "blokir saat hotspot menyala") ──
+    private fun pollHotspot() {
+        try { hotspotOn = Hotspot.detect(this).active } catch (e: Exception) { /* tidak diketahui: dianggap mati */ }
+    }
+
     // ── inti: hitung himpunan yang harus diblokir, bangun ulang VPN bila berubah ─
     private fun recompute() {
         val cfg = QuotaConfig.load(this)
-        if (!cfg.blockOn) { closeTun(); stopSelf(); return }
-        val set = BlockPolicy.blockedSet(cfg.blockRules, net, fg, screenOn, BlockStore.autoBlocked(this), System.currentTimeMillis(), packageName)
+        if (!cfg.blockOn) {
+            closeTun()
+            clearShizukuRules(stopAfter = true)
+            return
+        }
+        val set = if (AutoBlocker.scheduleActive(cfg)) {
+            BlockPolicy.blockedSet(cfg.blockRules, net, fg, screenOn, BlockStore.autoBlocked(this),
+                System.currentTimeMillis(), packageName, hotspotOn, packageAliases())
+        } else emptySet()
+        val wantsShizuku = cfg.blockerMode != "vpn" && ShizukuBlocker.isReady()
+        if (wantsShizuku && shizukuFailure && shizukuDesired == set) {
+            establishVpnFallback(set)
+            return
+        }
+        if (wantsShizuku) {
+            activeBackend = "vpn"
+            closeTun()
+            current = set
+            blockedCount = set.size
+            if (shizukuDesired == set && (shizukuBusy || shizukuApplied)) return
+            applyShizukuRules(set)
+            return
+        }
+        clearShizukuRules()
+        if (cfg.blockerMode == "shizuku" && !ShizukuBlocker.isReady()) {
+            Notifier.notifyInfo(this, "shizuku.fallback", "Mode VPN digunakan",
+                "Shizuku tidak siap. Pemblokiran dialihkan ke VPN lokal; pastikan izin VPN sudah diberikan.")
+        }
+        establishVpnFallback(set)
+    }
+
+    private fun establishVpnFallback(set: Set<String>) {
+        activeBackend = "vpn"
         if (set == current && (tun != null || set.isEmpty())) return
         if (set.isEmpty()) { closeTun(); current = set; blockedCount = 0; return }
         establishFor(set)
+    }
+
+    private fun applyShizukuRules(set: Set<String>) {
+        shizukuDesired = set
+        shizukuBusy = true
+        shizukuApplied = false
+        shizukuFailure = false
+        val generation = ++shizukuGeneration
+        io.launch {
+            val result = ShizukuBlocker(this@BlockerVpnService).applyPackages(set)
+            if (generation != shizukuGeneration) return@launch
+            shizukuBusy = false
+            shizukuApplied = result.ok
+            shizukuFailure = !result.ok
+            if (result.ok) activeBackend = "shizuku"
+            if (!result.ok) ShizukuBlocker(this@BlockerVpnService).clearAllRules()
+            handler.post {
+                if (!result.ok) {
+                    Log.w(TAG, "Firewall Shizuku gagal; beralih ke VPN: ${result.message}")
+                    Notifier.notifyInfo(this@BlockerVpnService, "shizuku.firewall-fallback", "Mode VPN digunakan",
+                        "Perintah firewall Shizuku gagal atau tidak didukung. Pemblokiran beralih ke VPN lokal; aturan Shizuku lama mungkin perlu dibersihkan saat Shizuku aktif kembali.")
+                }
+                recompute()
+            }
+        }
+    }
+
+    private fun clearShizukuRules(stopAfter: Boolean = false) {
+        if (shizukuCleanupPending) return
+        if (stopAfter && shizukuDesired == null && !shizukuApplied && !shizukuBusy) {
+            stopSelf()
+            return
+        }
+        if (shizukuDesired == null && !shizukuApplied && !shizukuBusy) return
+        ++shizukuGeneration
+        shizukuBusy = false
+        shizukuApplied = false
+        shizukuFailure = false
+        shizukuDesired = null
+        activeBackend = "vpn"
+        shizukuCleanupPending = true
+        io.launch {
+            val cleared = ShizukuBlocker(this@BlockerVpnService).clearAllRules()
+            if (!cleared) {
+                Log.w(TAG, "Aturan Shizuku belum dapat dibersihkan.")
+                Notifier.notifyInfo(this@BlockerVpnService, "shizuku.cleanup-failed", "Aturan Shizuku belum dibersihkan",
+                    "Shizuku tidak siap untuk menghapus aturan lama. Jalankan kembali Shizuku dan buka aplikasi agar aturan dapat dibersihkan.")
+            }
+            handler.post {
+                shizukuCleanupPending = false
+                if (stopAfter && !QuotaConfig.load(this@BlockerVpnService).blockOn) stopSelf()
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun packageAliases(): Map<String, Set<String>> {
+        if (packageAliases.isNotEmpty()) return packageAliases
+        try {
+            val pm = packageManager
+            val apps = if (android.os.Build.VERSION.SDK_INT >= 33)
+                pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0L))
+            else pm.getInstalledApplications(0)
+            val aliases = apps.groupBy { BlockPolicy.appIdOfUid(it.uid) }
+                .mapValues { (_, group) -> group.mapTo(HashSet()) { it.packageName } }
+            packageAliases = apps.associate { it.packageName to (aliases[BlockPolicy.appIdOfUid(it.uid)] ?: emptySet()) }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Tidak dapat membaca daftar aplikasi untuk memperluas aturan UID bersama.", e)
+            packageAliases = emptyMap()
+        }
+        return packageAliases
     }
 
     private fun establishFor(set: Set<String>) {
@@ -202,9 +328,11 @@ class BlockerVpnService : VpnService() {
 
     companion object {
         const val ACTION_REFRESH = "id.pantau.kuota.BLOCK_REFRESH"
+        private const val TAG = "BlockerVpnService"
         @Volatile var running = false
         @Volatile var blockedCount = 0
         @Volatile var revokedAt = 0L
+        @Volatile var activeBackend = "vpn"
         val dropped = AtomicLong(0L)
 
         fun prepared(c: Context): Boolean = VpnService.prepare(c) == null
@@ -221,6 +349,18 @@ class BlockerVpnService : VpnService() {
             if (!prepared(c)) return
             if (running) { poke(c); return }
             try { c.startService(Intent(c, BlockerVpnService::class.java)) } catch (e: Exception) { }
+        }
+
+        fun ensureCoordinator(c: Context) {
+            if (!QuotaConfig.load(c).blockOn || running) {
+                if (running) poke(c)
+                return
+            }
+            try { c.startService(Intent(c, BlockerVpnService::class.java)) }
+            catch (e: Exception) {
+                Log.e(TAG, "Tidak dapat menjalankan coordinator Shizuku.", e)
+                ensure(c)
+            }
         }
     }
 }

@@ -31,7 +31,7 @@ object QuotaEngine {
     private const val HOUR = QuotaMath.HOUR
 
     private fun uidOf(c: Context, pkg: String): Int? = try {
-        c.packageManager.getApplicationInfo(pkg, 0).uid
+        BlockPolicy.appIdOfUid(c.packageManager.getApplicationInfo(pkg, 0).uid)
     } catch (e: PackageManager.NameNotFoundException) { null } catch (e: Exception) { null }
 
     fun evaluate(c: Context, cfg: QuotaConfig, now: Long = System.currentTimeMillis()): QuotaStatus {

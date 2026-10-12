@@ -13,6 +13,7 @@
   --royal: #0033ff;
   --deep: #0600ab;
   --alert: #ff5a1f; /* HANYA untuk status kuota habis/terlampaui */
+  --radar: #ffe44d;
 
   --grad-1: linear-gradient(180deg, #f2e6ee, #977dff);
   --grad-2: linear-gradient(180deg, #ffccf2, #977dff, #0033ff);
@@ -51,6 +52,7 @@
   --color-royal: var(--royal);
   --color-deep: var(--deep);
   --color-alert: var(--alert);
+  --color-radar: var(--radar);
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -74,6 +76,7 @@ body {
   background: var(--surface);
   color: var(--text);
 }
+.nb-outline-ink { border-color: var(--ink); }
 .nb-press {
   transition: transform var(--dur) ease-out, box-shadow var(--dur) ease-out;
   cursor: pointer; min-height: 48px; min-width: 48px;

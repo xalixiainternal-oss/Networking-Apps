@@ -7,7 +7,8 @@ import { useHotspotState, useTether, sumTether, tetherSeries, HOTSPOT_KIND_LABEL
 import { useNow } from '../lib/hooks';
 import { findItem, useQuotaStatus } from '../lib/quotaStatus';
 import { Quota } from '../lib/quotaPlugin';
-import { updateSettings, useSettings } from '../lib/settings';
+import { setBlockRule, updateSettings, useSettings } from '../lib/settings';
+import { describeRule } from '../lib/blocking';
 import { HOUR, addLocalDays, cycleRange, fmtBytes, startOfLocalDay, type Bytes } from '../lib/usage';
 
 const fmtDate = (ms: number) => new Date(ms).toLocaleDateString('id-ID', { day: 'numeric', month: 'long' });
@@ -29,6 +30,7 @@ function Line({ title, b, base }: { title: string; b: Bytes; base: 1000 | 1024 }
 
 export function HotspotPage() {
   const st = useSettings();
+  const hotRules = Object.entries(st.blockRules).filter(([, r]) => r.hot);
   const now = useNow();
   const { rows, loading, note, reload } = useTether();
   const hs = useHotspotState();
@@ -143,6 +145,27 @@ export function HotspotPage() {
               : new Date(b.t).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} />
         </Card>
 
+        {/* aplikasi di HP ini yang diblokir selama hotspot menyala */}
+        <Card>
+          <div className="flex items-center gap-2 mb-1"><Ban size={20} strokeWidth={2.5} aria-hidden /><h2 className="m-0 text-lg font-bold">Aplikasi di HP ini saat hotspot menyala</h2></div>
+          <p className="m-0 mb-3 text-sm leading-snug">
+            Aplikasi yang kamu pilih <b>diblokir internetnya di HP ini</b> selama hotspot menyala, supaya kuota tidak terpakai pembaruan atau sinkronisasi
+            sebelum sempat dibagikan. Tanpa root. Ini <b>tidak</b> mengatur aplikasi di perangkat yang tersambung ke hotspot.
+          </p>
+          {!st.blockOn && <p className="m-0 mb-3 text-sm font-bold">Pemblokiran belum aktif. Aktifkan dulu di Pengaturan &gt; Blokir aplikasi.</p>}
+          {hotRules.length > 0 ? (
+            <ul className="m-0 p-0 list-none grid gap-2">
+              {hotRules.map(([pkg, r]) => (
+                <li key={pkg} className="flex items-center gap-2 justify-between">
+                  <span className="min-w-0"><span className="font-bold block truncate">{r.label}</span><span className="nb-label text-xs">{describeRule(r)}</span></span>
+                  <Button variant="ghost" aria-label={`Hapus ${r.label} dari daftar hotspot`} onClick={() => setBlockRule(pkg, r.label, { hot: false })}>Hapus</Button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="m-0 text-sm">Belum ada. Buka tab Aplikasi, ketuk sebuah aplikasi, lalu nyalakan "Blokir saat hotspot menyala" di kartu Blokir internet.</p>}
+          <p className="mt-3 mb-0 nb-label">STATUS HOTSPOT DIPERIKSA TIAP ~5 DETIK, BERGANTUNG PADA DETEKSI DI ATAS</p>
+        </Card>
+
         {/* hal yang jujur tidak bisa */}
         <Card tone="deep">
           <div className="flex items-center gap-2 mb-1"><Users size={20} strokeWidth={2.5} aria-hidden /><h2 className="m-0 text-lg font-bold">Perangkat terhubung</h2></div>
@@ -156,7 +179,7 @@ export function HotspotPage() {
           <div className="flex items-center gap-2 mb-1"><Ban size={20} strokeWidth={2.5} aria-hidden /><h2 className="m-0 text-lg font-bold">Pembatasan kecepatan hotspot</h2></div>
           <p className="m-0 mb-1 nb-label">TIDAK DIDUKUNG TANPA ROOT</p>
           <p className="m-0 text-sm leading-snug">
-            Trafik hotspot tidak melewati VPN lokal sebuah aplikasi, jadi tidak bisa dibatasi dari sini. Mode Lanjutan (root/Shizuku) yang bersifat eksperimental direncanakan di v0.6.
+            Trafik hotspot tidak melewati VPN lokal sebuah aplikasi, jadi tidak bisa dibatasi dari sini. Shizuku dapat menghentikan hotspot secara opt-in pada perangkat yang mendukung perintah sistemnya; kontrol klien dan batas bandwidth belum tersedia.
           </p>
         </Card>
       </div>

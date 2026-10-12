@@ -19,11 +19,12 @@ export function describeVpn(blockOn: boolean, v: VpnState | null): VpnSummary {
 }
 
 /** Ringkasan aturan satu aplikasi, mis. "Seluler · Background". */
-export function describeRule(r: Pick<BlockRuleCfg, 'cell' | 'wifi' | 'bg' | 'autoBlock'>): string {
+export function describeRule(r: Pick<BlockRuleCfg, 'cell' | 'wifi' | 'bg' | 'autoBlock'> & { hot?: boolean }): string {
   const parts: string[] = [];
   if (r.cell) parts.push('Seluler');
   if (r.wifi) parts.push('Wi-Fi');
   if (r.bg) parts.push('Background');
+  if (r.hot) parts.push('Saat hotspot menyala');
   if (r.autoBlock) parts.push('Otomatis saat batas');
   return parts.join(' · ');
 }

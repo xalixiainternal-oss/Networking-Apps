@@ -4,6 +4,12 @@ import android.content.Context
 import org.json.JSONObject
 
 data class AppLimit(val pkg: String, val label: String, val daily: Long, val monthly: Long)
+data class BlockSchedule(val enabled: Boolean = false, val startMinute: Int = 8 * 60, val endMinute: Int = 15 * 60)
+data class SafetyConfig(
+    val disableMobileData: Boolean = false,
+    val stopHotspot: Boolean = false,
+    val stopLimitedApps: Boolean = false
+)
 
 /** Konfigurasi yang diisi pengguna di UI, disalin ke SharedPreferences supaya Worker/Service bisa membacanya tanpa WebView. */
 data class QuotaConfig(
@@ -22,7 +28,10 @@ data class QuotaConfig(
     val persistentOn: Boolean = true,
     /** v0.5: saklar utama pemblokiran per aplikasi lewat VPN lokal, dan aturannya. */
     val blockOn: Boolean = false,
-    val blockRules: List<BlockPolicy.Rule> = emptyList()
+    val blockRules: List<BlockPolicy.Rule> = emptyList(),
+    val blockSchedule: BlockSchedule = BlockSchedule(),
+    val blockerMode: String = "auto",
+    val safety: SafetyConfig = SafetyConfig()
 ) {
     companion object {
         private const val PREFS = "pantau_cfg"
@@ -40,6 +49,8 @@ data class QuotaConfig(
         fun parse(o: JSONObject): QuotaConfig {
             val night = o.optJSONObject("night")
             val hot = o.optJSONObject("hotspot")
+            val schedule = o.optJSONObject("blockSchedule")
+            val safety = o.optJSONObject("safety")
             val limits = ArrayList<AppLimit>()
             val arr = o.optJSONArray("appLimits")
             if (arr != null) {
@@ -63,7 +74,8 @@ data class QuotaConfig(
                     val wifi = r.optBoolean("wifi", false)
                     val bg = r.optBoolean("bg", false)
                     val auto = r.optBoolean("autoBlock", false)
-                    if (cell || wifi || bg || auto) rules.add(BlockPolicy.Rule(pkg, r.optString("label", pkg), cell, wifi, bg, auto))
+                    val hot = r.optBoolean("hot", false)
+                    if (cell || wifi || bg || auto || hot) rules.add(BlockPolicy.Rule(pkg, r.optString("label", pkg), cell, wifi, bg, auto, hot))
                 }
             }
             return QuotaConfig(
@@ -81,8 +93,32 @@ data class QuotaConfig(
                 alertsOn = o.optBoolean("alerts", true),
                 persistentOn = o.optBoolean("persistent", true),
                 blockOn = block?.optBoolean("on", false) ?: false,
-                blockRules = rules
+                blockRules = rules,
+                blockSchedule = BlockSchedule(
+                    enabled = schedule?.optBoolean("enabled", false) ?: false,
+                    startMinute = parseMinute(schedule?.optString("start", "08:00") ?: "08:00", 8 * 60),
+                    endMinute = parseMinute(schedule?.optString("end", "15:00") ?: "15:00", 15 * 60)
+                ),
+                blockerMode = when (o.optString("blockerMode", "auto")) {
+                    "vpn" -> "vpn"
+                    "shizuku" -> "shizuku"
+                    else -> "auto"
+                },
+                safety = SafetyConfig(
+                    disableMobileData = safety?.optBoolean("disableMobileData", false) ?: false,
+                    stopHotspot = safety?.optBoolean("stopHotspot", false) ?: false,
+                    stopLimitedApps = safety?.optBoolean("stopLimitedApps", false) ?: false
+                )
             )
+        }
+
+        private fun parseMinute(value: String, fallback: Int): Int {
+            val parts = value.split(":")
+            if (parts.size != 2) return fallback
+            val hour = parts[0].toIntOrNull() ?: return fallback
+            val minute = parts[1].toIntOrNull() ?: return fallback
+            if (hour !in 0..23 || minute !in 0..59) return fallback
+            return hour * 60 + minute
         }
     }
 }

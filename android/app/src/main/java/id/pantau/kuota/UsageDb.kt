@@ -111,7 +111,7 @@ interface UsageDao {
 
 @Database(
     entities = [UsageHour::class, AppHour::class, AppInfo::class, TetherHour::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class UsageDb : RoomDatabase() {
@@ -142,9 +142,23 @@ abstract class UsageDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE `app_hour_normalized` (`uid` INTEGER NOT NULL, `hourStart` INTEGER NOT NULL, `net` TEXT NOT NULL, `rx` INTEGER NOT NULL, `tx` INTEGER NOT NULL, `isFg` INTEGER NOT NULL, PRIMARY KEY(`uid`, `hourStart`, `net`))")
+                db.execSQL("INSERT INTO `app_hour_normalized` SELECT uid % 100000, hourStart, net, SUM(rx), SUM(tx), MAX(isFg) FROM `app_hour` GROUP BY uid % 100000, hourStart, net")
+                db.execSQL("DROP TABLE `app_hour`")
+                db.execSQL("ALTER TABLE `app_hour_normalized` RENAME TO `app_hour`")
+
+                db.execSQL("CREATE TABLE `app_info_normalized` (`uid` INTEGER NOT NULL, `packageName` TEXT NOT NULL, `label` TEXT NOT NULL, `isSystem` INTEGER NOT NULL, PRIMARY KEY(`uid`))")
+                db.execSQL("INSERT INTO `app_info_normalized` SELECT uid % 100000, MIN(packageName), MIN(label), MAX(isSystem) FROM `app_info` GROUP BY uid % 100000")
+                db.execSQL("DROP TABLE `app_info`")
+                db.execSQL("ALTER TABLE `app_info_normalized` RENAME TO `app_info`")
+            }
+        }
+
         fun get(c: Context): UsageDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, UsageDb::class.java, "usage.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)   // riwayat pengguna tidak boleh hilang saat update
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)   // riwayat pengguna tidak boleh hilang saat update
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 .also { inst = it }

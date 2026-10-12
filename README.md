@@ -1,7 +1,7 @@
 # Xai Network
 
 Pemantau kuota & hotspot untuk Android. Data hanya di perangkat; app **tidak punya izin INTERNET**.
-Status: **v0.5** (blokir per aplikasi lewat VPN lokal). Batas kecepatan dan mode root/Shizuku (v0.6) belum ada.
+Status: **v0.7** (blokir aplikasi lewat VPN lokal atau Shizuku eksperimental, jadwal blokir, kunci PIN Pengaturan, prediksi sisa kuota, jatah aman per hari, perbandingan minggu, pintasan USSD).
 
 ## Build lokal
 ```
@@ -51,7 +51,7 @@ penghitungan operator berbeda dari penghitungan kernel (header/overhead, MMS, ro
 ## v0.4 — hotspot, batas, notifikasi
 **Hotspot.** Pemakaian tethering dibaca dari bucket `UID_TETHERING` dan disimpan per jam di tabel `tether_hour`. Sudah termasuk dalam total seluler.
 Tidak tercatat bila HP/pabrikan tidak mengisi bucket itu, atau bila upstream hotspot bukan data HP ini. Status "hotspot aktif" hanyalah **perkiraan** dari antarmuka jaringan (`ap0`, `swlan0`, `rndis0`, dst.).
-**Tidak mungkin tanpa root:** mematikan hotspot otomatis, daftar perangkat terhubung/pemakaian per klien, dan membatasi bandwidth hotspot. UI menampilkannya apa adanya.
+**Tidak tersedia untuk aplikasi biasa:** daftar perangkat terhubung/pemakaian per klien, dan membatasi bandwidth hotspot. Penghentian hotspot hanya ditawarkan sebagai aksi opt-in melalui Shizuku; dukungan bergantung versi Android/OEM.
 
 **Batas & peringatan.** Kuota seluler, kuota malam (pemakaian di jam malam dihitung dulu ke kuota malam, sisanya tumpah ke kuota utama), kuota Wi-Fi, batas hotspot harian/siklus, dan batas per aplikasi
 (harian/siklus, dihitung dari data seluler). Perhitungan hanya ada di Kotlin (`QuotaEngine` + `QuotaMath`) dan dipakai UI, notifikasi peringatan, dan notifikasi tetap supaya angkanya tidak pernah beda.
@@ -59,9 +59,9 @@ Notifikasi 80/90/100% dikirim sekali per ambang per periode; mengubah kuota meng
 
 **Notifikasi tetap.** Foreground service tipe `specialUse`, berdetak tiap 3 detik hanya saat layar menyala. Bisa dimatikan di Pengaturan. Android 14+ mengizinkan pengguna menggesernya.
 
-**Izin baru:** `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`. Tetap tanpa `INTERNET`.
+**Izin baru:** `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`. Tetap tanpa `INTERNET`; permission/provider Shizuku dijelaskan di bagian Shizuku.
 
-**Database.** Versi Room 3 dengan migrasi nyata 1→2→3: riwayat tidak dihapus saat update (sebelumnya `fallbackToDestructiveMigration`).
+**Database.** Versi Room 4 dengan migrasi nyata 1→2→3→4: riwayat tidak dihapus saat update (sebelumnya `fallbackToDestructiveMigration`). Migrasi 3→4 menormalkan UID profil dan menggabungkan bucket penggunaan yang merujuk appId sama.
 
 ## v0.5 — blokir internet per aplikasi (VPN lokal, tanpa root)
 **Cara kerja.** `BlockerVpnService` membuat VPN hanya untuk aplikasi yang sedang harus diblokir (`addAllowedApplication`), dengan rute IPv4 dan IPv6 penuh.
@@ -82,6 +82,31 @@ Logika "siapa diblokir sekarang" ada di `BlockPolicy.java` (murni, diuji di JVM)
 - Blokir otomatis dihitung dari data per aplikasi yang disinkronkan (tiap 15 menit saat layar menyala, tiap jam di latar), jadi tidak seketika.
 - Tidak ada izin baru di manifest selain deklarasi `BIND_VPN_SERVICE` pada service. Dialog izin VPN dimunculkan sistem saat saklar dinyalakan.
 
+## v0.6 — profil aplikasi, jadwal, PIN, dan radar kuota
+**UID lintas profil.** Statistik aplikasi dinormalisasi ke appId Android (UID modulo 100000), sehingga penggunaan aplikasi dengan appId yang sama di profil pengguna/work profile dijumlahkan. Migrasi Room 3→4 juga menggabungkan riwayat lama. Aplikasi berbagi UID ditampilkan/diblokir sebagai satu identitas jaringan.
+
+**Batasan profil kloning.** Aplikasi biasa tidak memperoleh hak untuk menginspeksi atau mengatur paket pada semua profil Android. Pembacaan statistik hanya menggabungkan UID yang dilaporkan `NetworkStatsManager`; VPN hanya dapat memasukkan paket yang terlihat dan diizinkan Android untuk profil layanan. Dukungan penuh untuk kloning OEM atau work profile tidak dapat dijamin pada semua perangkat.
+
+**Jadwal blokir.** Jadwal harian memakai waktu lokal perangkat, batas akhir eksklusif, dan mendukung rentang lintas tengah malam. Saklar utama blokir tetap harus aktif. Layanan mengecek jadwal berkala dan WorkManager mengevaluasi ulang saat sinkron; Android dapat menunda pekerjaan latar saat hemat baterai.
+
+**PIN Pengaturan.** PIN 4–8 digit disimpan sebagai hash bersalt di penyimpanan lokal WebView dan diminta setiap kali halaman Pengaturan dibuka. Ini hanya penghalang pada antarmuka aplikasi, bukan penyimpanan rahasia yang tahan terhadap pengguna dengan akses perangkat, penghapusan data, atau inspeksi aplikasi; tetap gunakan kunci layar Android.
+
+**Radar kuota.** Dashboard menghitung hari perkiraan sampai kuota utama habis dari laju rata-rata seluler pada siklus berjalan. Prediksi bersifat indikatif dan tidak mewakili kuota operator.
+
+## Shizuku — firewall eksperimental dan aksi keselamatan
+Shizuku dapat dipilih di Pengaturan sebagai backend atau dipakai otomatis bila siap; VPN lokal tetap jalur fallback. Integrasi menggunakan Shizuku UserService dengan operasi shell allowlist dan argumen terpisah. Dukungan firewall diprobe saat runtime dan membutuhkan perintah Android Connectivity untuk membaca serta mengatur status firewall paket/chain (Android 13+); perangkat OEM dapat menolak atau mengubah perilaku. Setiap aturan dibaca kembali untuk memastikan statusnya benar. Jika operasi tidak berhasil, aturan dibersihkan bila mungkin, VPN lokal dicoba dan notifikasi diberikan.
+
+Pengguna perlu memasang serta menjalankan aplikasi Shizuku, menyetujui izin akses Shizuku, dan juga mengizinkan VPN lokal agar fallback benar-benar dapat bekerja. Aksi mematikan data seluler, menghentikan hotspot, dan menghentikan aplikasi dengan batas terlampaui semuanya **mati secara default** dan memerlukan opt-in. Penghentian aplikasi mengecualikan aplikasi sistem dan launcher; data seluler hanya dimatikan ketika jaringan aktif adalah seluler serta dipulihkan pada siklus baru bila tindakan itu tercatat berhasil. Hotspot perlu dinyalakan kembali manual. Uji pada perangkat dan aplikasi non-esensial sebelum mengandalkannya; status Shizuku tidak menjamin dukungan perintah OEM.
+
+**Izin baru:** dependency Shizuku API/provider dan provider dengan permission lintas pengguna. Tidak ditambahkan izin `INTERNET`; perintah UserService tetap dibatasi allowlist.
+
 ## Sumber ketidakakuratan yang wajar
 Pembagian jam memakai proration bucket sistem; data lama di sistem sudah dikasarkan; penghitungan operator berbeda dari kernel (header, MMS, roaming);
 aplikasi yang sudah dihapus dan proses sistem jatuh ke "Lainnya"; kuota malam dihitung per jam penuh.
+
+## v0.7 — perbaikan build & ketahanan Shizuku
+- **Perbaikan build:** `buildFeatures { buildConfig true }` diaktifkan (AGP 8 tidak membuatnya otomatis; `ShizukuClient` memakai `BuildConfig`).
+- **Gradle Wrapper:** distribusi `-bin` dan `networkTimeout=60000` agar unduhan tidak timeout di jaringan lambat.
+- **`blockApp` aditif:** memblokir satu aplikasi lewat Shizuku tidak lagi membuka blokir aplikasi lain yang sudah tercatat.
+- **`ShellOutputParser`:** pembacaan keluaran `cmd connectivity get-*` dipusatkan dan diuji (`ShellOutputParserTest`); bila format tidak dikenali hasilnya `null` dan app kembali ke VPN.
+- **Belum teruji di perangkat:** `set-package-networking-enabled` / `set-chain3-enabled` (Android 13+, bisa beda per OEM). Uji manual: aktifkan Shizuku, blokir satu aplikasi, cek `cmd connectivity get-package-networking-enabled <paket>`.

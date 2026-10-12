@@ -9,6 +9,7 @@ class UsageWorker(c: Context, p: WorkerParameters) : CoroutineWorker(c, p) {
         UsageSync.sync(applicationContext)
         UsageSync.syncApps(applicationContext)
         Notifier.checkAndNotify(applicationContext)    // v0.4: peringatan 80/90/100%
+        BlockerVpnService.ensure(applicationContext)   // evaluasi ulang jadwal walau layar mati / service berhenti
         Result.success()
     } catch (e: Exception) { Result.retry() }
 

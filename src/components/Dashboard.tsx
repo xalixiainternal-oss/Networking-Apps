@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Gauge, Info, Radio, TrendingUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Gauge, Info, Phone, Radio, TrendingUp, TriangleAlert } from 'lucide-react';
 import { Card, GradCard, ProgressBar, Button } from './ui';
 import { Header } from './Header';
 import { BarChart, type NetFilter } from './Chart';
@@ -9,6 +9,7 @@ import { useQuotaStatus, findItem } from '../lib/quotaStatus';
 import { Quota } from '../lib/quotaPlugin';
 import { useIconCache, loadIcon, ensureAppSync } from '../lib/appUsage';
 import { useSettings } from '../lib/settings';
+import { dailyAllowance, daysUntilQuotaEmpty, ussdHref, weekCompare } from '../lib/insights';
 import {
   DAY, HOUR, addLocalDays, bucketSeries, cycleRange,
   fmtBytes, fmtSpeed, forecast, splitByNet, startOfLocalDay, type Bytes,
@@ -60,6 +61,7 @@ export function Dashboard({ onGoToApps }: DashboardProps) {
       hotCycle: sumTether(tether, cyc.start, cyc.end),
       hourly: bucketSeries(rows, t0, 24, 'hour'),
       daily:  bucketSeries(rows, addLocalDays(t0, -29), 30, 'day'),
+      weekCmp: weekCompare(rows, now),
     };
   }, [rows, tether, st.resetDay, now]);
 
@@ -69,6 +71,10 @@ export function Dashboard({ onGoToApps }: DashboardProps) {
   const wifiQ = findItem(status, 'wifi');
   const fc    = main ? forecast(main.used, main.quota, main.periodStart, main.periodEnd, now) : null;
   const anyQuota = Boolean(main || night || wifiQ);
+  const allowance = main && main.quota > 0 && main.quota > main.used
+    ? dailyAllowance(main.quota - main.used, now, main.periodEnd) : null;
+  const radarDays = main ? daysUntilQuotaEmpty(main.used, main.quota, main.periodStart, now) : null;
+  const ussd = ussdHref(st.ussd);
 
   return (
     <>
@@ -125,6 +131,9 @@ export function Dashboard({ onGoToApps }: DashboardProps) {
                     {fc?.kind === 'tanggal' && `Perkiraan habis sekitar ${fmtDate(fc.at)} (dari rata-rata harian siklus ini).`}
                     {fc?.kind === 'belum'   && 'Belum cukup data untuk memperkirakan.'}
                   </p>
+                  {allowance !== null && (
+                    <p className="m-0 nb-num">JATAH AMAN {fmtBytes(allowance, st.base)} / HARI</p>
+                  )}
                 </div>
               )}
               {night && (
@@ -134,7 +143,46 @@ export function Dashboard({ onGoToApps }: DashboardProps) {
               {wifiQ && <ProgressBar percent={wifiQ.pct} label={`Wi-Fi ${fmtBytes(wifiQ.used, st.base)} / ${fmtBytes(wifiQ.quota, st.base)}`} />}
             </div>
           ) : <p className="m-0">Isi total kuota di Pengaturan untuk melihat sisa dan perkiraan habis.</p>}
+          {ussd && (
+            <a href={ussd} className="nb-box nb-press bg-pink text-ink px-4 py-2 font-bold text-base mt-4 flex items-center justify-center gap-2 no-underline">
+              <Phone size={18} strokeWidth={2.5} aria-hidden />Cek kuota ke operator ({st.ussd})
+            </a>
+          )}
         </Card>
+
+        {main && (
+          <div className="nb-box nb-outline-ink bg-radar text-ink p-4 grid gap-2" role="status" style={{ '--sh': '6px' } as React.CSSProperties}>
+            <div className="flex items-center gap-2">
+              <TriangleAlert size={24} strokeWidth={3} aria-hidden />
+              <h2 className="m-0 text-lg font-bold uppercase">Radar kuota</h2>
+            </div>
+            {radarDays === null
+              ? <p className="m-0 font-bold uppercase">Data pemakaian belum cukup untuk membuat prediksi.</p>
+              : radarDays === 0
+                ? <p className="m-0 nb-num text-xl uppercase">Kuota sudah habis.</p>
+                : <p className="m-0 font-bold uppercase">
+                  Dengan rata-rata pemakaian siklus ini, kuota diperkirakan habis dalam{' '}
+                  <span className="nb-num text-xl">{radarDays.toLocaleString('id-ID', { maximumFractionDigits: 1 })} hari</span>.
+                </p>}
+            <p className="m-0 text-sm font-bold">Estimasi berdasarkan pemakaian seluler sejak awal siklus; pemakaian dapat berubah.</p>
+          </div>
+        )}
+
+        {/* dibanding minggu lalu */}
+        {(d.weekCmp.cur > 0 || d.weekCmp.prev > 0) && (
+          <Card>
+            <h2 className="m-0 mb-2 text-lg font-bold">Dibanding minggu lalu</h2>
+            <p className="m-0 nb-num text-xl">
+              {d.weekCmp.pct === null ? 'BELUM ADA PEMBANDING'
+                : `${d.weekCmp.pct > 0 ? '▲ +' : d.weekCmp.pct < 0 ? '▼ ' : ''}${d.weekCmp.pct.toLocaleString('id-ID', { maximumFractionDigits: 0 })}%`}
+            </p>
+            <p className="mt-2 mb-0 text-sm">
+              7 hari terakhir {fmtBytes(d.weekCmp.cur, st.base)} seluler, sebelumnya {fmtBytes(d.weekCmp.prev, st.base)}.
+              {d.weekCmp.pct !== null && d.weekCmp.pct > 20 && ' Lebih boros dari biasanya.'}
+              {d.weekCmp.pct !== null && d.weekCmp.pct < -20 && ' Lebih hemat dari biasanya.'}
+            </p>
+          </Card>
+        )}
 
         {/* top-5 boros */}
         <Card>

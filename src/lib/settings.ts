@@ -1,11 +1,12 @@
 import { useSyncExternalStore } from 'react';
+import { sanitizeUssd } from './insights';
 
 export type Unit = 'MB' | 'GB';
 export interface Amount { v: number; u: Unit }
 export interface AppLimitCfg { label: string; daily: Amount; monthly: Amount }
 
 /** Aturan blokir internet satu aplikasi (VPN lokal). */
-export interface BlockRuleCfg { label: string; cell: boolean; wifi: boolean; bg: boolean; autoBlock: boolean }
+export interface BlockRuleCfg { label: string; cell: boolean; wifi: boolean; bg: boolean; autoBlock: boolean; hot: boolean }
 
 export interface Settings {
   quotaValue: number; quotaUnit: Unit; resetDay: number; base: 1000 | 1024; theme: 'system' | 'light' | 'dark';
@@ -21,10 +22,18 @@ export interface Settings {
   alerts: boolean;
   /** Notifikasi tetap (layanan latar). */
   persistent: boolean;
-  /** Saklar utama pemblokiran (memakai slot VPN). Mati = tidak ada yang diblokir, aturan tetap tersimpan. */
+  /** Saklar utama pemblokiran. Mati = tidak ada yang diblokir, aturan tetap tersimpan. */
   blockOn: boolean;
+  /** Jadwal harian lokal untuk pemblokiran. Rentang akhir eksklusif; lintas tengah malam didukung. */
+  blockSchedule: { enabled: boolean; start: string; end: string };
+  /** Backend pemblokiran; auto memilih Shizuku bila siap, VPN lokal menjadi fallback. */
+  blockerMode: 'auto' | 'vpn' | 'shizuku';
+  /** Aksi perangkat berisiko; seluruhnya opt-in dan mati secara default. */
+  safety: { disableMobileData: boolean; stopHotspot: boolean; stopLimitedApps: boolean };
   /** Aturan blokir per aplikasi, kunci = nama paket. */
   blockRules: Record<string, BlockRuleCfg>;
+  /** Kode USSD cek kuota operator (mis. *123#); kosong = tombol pintasan disembunyikan. */
+  ussd: string;
 }
 
 const KEY = 'settings.v1';
@@ -36,7 +45,10 @@ export const DEFAULTS: Settings = {
   hotspot: { daily: A0(), monthly: A0() },
   appLimits: {},
   alerts: true, persistent: true,
-  blockOn: false, blockRules: {},
+  blockOn: false, blockSchedule: { enabled: false, start: '08:00', end: '15:00' }, blockRules: {},
+  blockerMode: 'auto',
+  safety: { disableMobileData: false, stopHotspot: false, stopLimitedApps: false },
+  ussd: '',
 };
 
 const num = (x: unknown, d: number) => (typeof x === 'number' && Number.isFinite(x) ? x : d);
@@ -45,6 +57,7 @@ const amount = (x: unknown): Amount => {
   return { v: Math.max(0, num(o.v, 0)), u: o.u === 'MB' ? 'MB' : 'GB' };
 };
 const hour = (x: unknown, d: number) => Math.min(23, Math.max(0, Math.floor(num(x, d))));
+const clock = (x: unknown, d: string) => typeof x === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x) ? x : d;
 
 /** Gabungkan data tersimpan (bisa dari versi lama atau rusak) dengan bawaan, lapis demi lapis. */
 export function mergeSettings(raw: unknown): Settings {
@@ -60,8 +73,8 @@ export function mergeSettings(raw: unknown): Settings {
   if (r.blockRules && typeof r.blockRules === 'object') {
     for (const [pkg, b] of Object.entries<any>(r.blockRules)) {
       if (!pkg || !b || typeof b !== 'object') continue;
-      const rule = { label: typeof b.label === 'string' ? b.label : pkg, cell: b.cell === true, wifi: b.wifi === true, bg: b.bg === true, autoBlock: b.autoBlock === true };
-      if (rule.cell || rule.wifi || rule.bg || rule.autoBlock) rules[pkg] = rule;
+      const rule = { label: typeof b.label === 'string' ? b.label : pkg, cell: b.cell === true, wifi: b.wifi === true, bg: b.bg === true, autoBlock: b.autoBlock === true, hot: b.hot === true };
+      if (rule.cell || rule.wifi || rule.bg || rule.autoBlock || rule.hot) rules[pkg] = rule;
     }
   }
   return {
@@ -81,7 +94,19 @@ export function mergeSettings(raw: unknown): Settings {
     alerts: r.alerts !== false,
     persistent: r.persistent !== false,
     blockOn: r.blockOn === true,
+    blockSchedule: {
+      enabled: r.blockSchedule?.enabled === true,
+      start: clock(r.blockSchedule?.start, DEFAULTS.blockSchedule.start),
+      end: clock(r.blockSchedule?.end, DEFAULTS.blockSchedule.end),
+    },
+    blockerMode: r.blockerMode === 'vpn' || r.blockerMode === 'shizuku' ? r.blockerMode : 'auto',
+    safety: {
+      disableMobileData: r.safety?.disableMobileData === true,
+      stopHotspot: r.safety?.stopHotspot === true,
+      stopLimitedApps: r.safety?.stopLimitedApps === true,
+    },
     blockRules: rules,
+    ussd: sanitizeUssd(r.ussd),
   };
 }
 
@@ -107,10 +132,10 @@ export function setAppLimit(pkg: string, label: string, daily: Amount, monthly: 
 
 /** Ubah sebagian aturan blokir satu aplikasi; aturan yang semua pilihannya mati dihapus. */
 export function setBlockRule(pkg: string, label: string, patch: Partial<Omit<BlockRuleCfg, 'label'>>) {
-  const prev = cache.blockRules[pkg] ?? { label, cell: false, wifi: false, bg: false, autoBlock: false };
+  const prev = cache.blockRules[pkg] ?? { label, cell: false, wifi: false, bg: false, autoBlock: false, hot: false };
   const next: BlockRuleCfg = { ...prev, ...patch, label };
   const rules = { ...cache.blockRules };
-  if (next.cell || next.wifi || next.bg || next.autoBlock) rules[pkg] = next; else delete rules[pkg];
+  if (next.cell || next.wifi || next.bg || next.autoBlock || next.hot) rules[pkg] = next; else delete rules[pkg];
   updateSettings({ blockRules: rules });
 }
 

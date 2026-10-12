@@ -7,6 +7,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(QuotaPlugin.class);
+        registerPlugin(ShizukuPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

@@ -14,12 +14,12 @@ describe('aturan blokir di pengaturan', () => {
   it('aturan yang semua pilihannya mati dibuang; selain itu dipertahankan', () => {
     const s = mergeSettings({ blockOn: true, blockRules: {
       'com.a': { label: 'A', cell: true },
-      'com.b': { label: 'B', cell: false, wifi: false, bg: false, autoBlock: false },
+      'com.b': { label: 'B', cell: false, wifi: false, bg: false, autoBlock: false, hot: false },
       'com.c': 'rusak', '': { cell: true },
     } });
     expect(s.blockOn).toBe(true);
     expect(Object.keys(s.blockRules)).toEqual(['com.a']);
-    expect(s.blockRules['com.a']).toEqual({ label: 'A', cell: true, wifi: false, bg: false, autoBlock: false });
+    expect(s.blockRules['com.a']).toEqual({ label: 'A', cell: true, wifi: false, bg: false, autoBlock: false, hot: false });
   });
   it('hanya true eksplisit yang menyalakan saklar utama', () => {
     expect(mergeSettings({ blockOn: 'ya' }).blockOn).toBe(false);
@@ -27,7 +27,7 @@ describe('aturan blokir di pengaturan', () => {
   });
   it('konfigurasi native memuat saklar dan aturan', () => {
     const s = mergeSettings({ blockOn: true, blockRules: { 'com.a': { label: 'A', cell: true, bg: true } } });
-    expect(buildNativeConfig(s).block).toEqual({ on: true, rules: [{ pkg: 'com.a', label: 'A', cell: true, wifi: false, bg: true, autoBlock: false }] });
+    expect(buildNativeConfig(s).block).toEqual({ on: true, rules: [{ pkg: 'com.a', label: 'A', cell: true, wifi: false, bg: true, autoBlock: false, hot: false }] });
   });
 });
 

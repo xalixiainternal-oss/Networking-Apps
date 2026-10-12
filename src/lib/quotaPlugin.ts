@@ -58,6 +58,11 @@ export interface VpnState {
   autoBlocked: { pkg: string; until: number }[];
 }
 
+export type ShizukuStateName = 'not_installed' | 'not_running' | 'permission_required' | 'ready';
+export interface ShizukuStatus { state: ShizukuStateName; ready: boolean; installed: boolean; message: string }
+export interface ShizukuGrantResult { name: string; granted: boolean; message: string }
+export interface BlockerBackend { requested: string; active: 'vpn' | 'shizuku'; fallback: boolean }
+
 export interface QuotaPlugin {
   getPermissionStatus(): Promise<PermissionStatus>;
   openUsageAccessSettings(): Promise<void>;
@@ -89,7 +94,17 @@ export interface QuotaPlugin {
   openVpnSettings(): Promise<void>;
 }
 
+export interface ShizukuPlugin {
+  getShizukuStatus(): Promise<ShizukuStatus>;
+  requestShizukuPermission(): Promise<{ granted: boolean; message?: string }>;
+  openShizuku(): Promise<void>;
+  grantRequiredPermissions(): Promise<{ results: ShizukuGrantResult[] }>;
+  getBlockerBackend(): Promise<BlockerBackend>;
+  addListener(eventName: 'shizukuStateChange', listener: (status: ShizukuStatus) => void): Promise<{ remove: () => Promise<void> }>;
+}
+
 const native = registerPlugin<QuotaPlugin>('Quota');
+const nativeShizuku = registerPlugin<ShizukuPlugin>('ShizukuControl');
 
 const web: QuotaPlugin = {
   getPermissionStatus: async () => ({ usageAccess: false, notifications: false, batteryOptimizationIgnored: false }),
@@ -121,3 +136,14 @@ const web: QuotaPlugin = {
 };
 
 export const Quota: QuotaPlugin = Capacitor.isNativePlatform() ? native : web;
+
+const webShizuku: ShizukuPlugin = {
+  getShizukuStatus: async () => ({ state: 'not_installed', ready: false, installed: false, message: 'Shizuku hanya tersedia di Android.' }),
+  requestShizukuPermission: async () => ({ granted: false, message: 'Shizuku hanya tersedia di Android.' }),
+  openShizuku: async () => { throw new Error('Shizuku hanya tersedia di Android.'); },
+  grantRequiredPermissions: async () => ({ results: [] }),
+  getBlockerBackend: async () => ({ requested: 'auto', active: 'vpn', fallback: true }),
+  addListener: async () => ({ remove: async () => {} }),
+};
+
+export const ShizukuControl: ShizukuPlugin = Capacitor.isNativePlatform() ? nativeShizuku : webShizuku;

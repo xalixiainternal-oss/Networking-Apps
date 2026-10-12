@@ -18,8 +18,11 @@ export function buildNativeConfig(s: Settings) {
     persistent: s.persistent,
     block: {
       on: s.blockOn,
-      rules: Object.entries(s.blockRules).map(([pkg, r]) => ({ pkg, label: r.label, cell: r.cell, wifi: r.wifi, bg: r.bg, autoBlock: r.autoBlock })),
+      rules: Object.entries(s.blockRules).map(([pkg, r]) => ({ pkg, label: r.label, cell: r.cell, wifi: r.wifi, bg: r.bg, autoBlock: r.autoBlock, hot: r.hot })),
     },
+    blockSchedule: s.blockSchedule,
+    blockerMode: s.blockerMode,
+    safety: s.safety,
   };
 }
 

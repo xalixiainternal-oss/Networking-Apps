@@ -16,7 +16,7 @@ export function BlockCard({ row }: { row: AppRow }) {
   const [msg, setMsg] = useState<string | null>(null);
 
   const pkg = row.packageName;
-  const rule = st.blockRules[pkg] ?? { label: row.label, cell: false, wifi: false, bg: false, autoBlock: false };
+  const rule = st.blockRules[pkg] ?? { label: row.label, cell: false, wifi: false, bg: false, autoBlock: false, hot: false };
   const set = (patch: Parameters<typeof setBlockRule>[2]) => setBlockRule(pkg, row.label, patch);
   const sum = describeVpn(st.blockOn, vpn);
   const auto = vpn?.autoBlocked.find((a) => a.pkg === pkg);
@@ -49,6 +49,9 @@ export function BlockCard({ row }: { row: AppRow }) {
           <Toggle checked={rule.wifi} onChange={(wifi) => set({ wifi })} label="Blokir saat memakai Wi-Fi" />
           <Toggle checked={rule.bg} onChange={(bg) => set({ bg })} label="Blokir saat di background"
             hint="Diblokir kapan pun tidak sedang di layar, termasuk saat layar mati. Pergantian aplikasi terdeteksi tiap sekitar 2 detik, jadi ada jeda singkat." />
+
+          <Toggle checked={rule.hot} onChange={(hot) => set({ hot })} label="Blokir saat hotspot menyala"
+            hint="Selama hotspot/tethering HP ini menyala, internet aplikasi ini di HP diblokir supaya kuota tidak habis sebelum dibagikan. Tidak memengaruhi perangkat yang tersambung ke hotspot." />
 
           <Toggle checked={rule.autoBlock} disabled={!canAuto && !rule.autoBlock}
             onChange={(on) => { if (on) setConfirmAuto(true); else set({ autoBlock: false }); }}

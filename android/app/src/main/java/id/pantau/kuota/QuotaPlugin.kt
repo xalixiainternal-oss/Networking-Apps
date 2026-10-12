@@ -100,7 +100,7 @@ class QuotaPlugin : Plugin() {
         UsageWorker.schedule(context)
         UsageWorker.runOnce(context)      // data pertama muncul tanpa menunggu jadwal 1 jam
         applyServiceState()
-        BlockerVpnService.ensure(context)
+        BlockerFactory.ensure(context)
         call.resolve()
     }
 
@@ -279,7 +279,7 @@ class QuotaPlugin : Plugin() {
         try { JSONObject(json) } catch (e: Exception) { call.reject("Konfigurasi tidak valid."); return }
         QuotaConfig.save(context, json)
         applyServiceState()
-        BlockerVpnService.ensure(context)
+        BlockerFactory.ensure(context)
         io.launch {
             try { Notifier.checkAndNotify(context) } catch (e: Exception) { /* abaikan: dicek lagi di jadwal berikutnya */ }
             call.resolve()
@@ -406,6 +406,7 @@ class QuotaPlugin : Plugin() {
                 .put("revokedAt", BlockerVpnService.revokedAt)
                 .put("autoBlocked", auto))
         }
+
     }
 
     /** Pengguna membuka blokir otomatis suatu aplikasi sebelum periodenya berakhir. */

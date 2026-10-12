@@ -2,11 +2,13 @@ package id.pantau.kuota;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import id.pantau.kuota.BlockPolicy.Rule;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,5 +49,42 @@ public class BlockPolicyTest {
     @Test public void tidakPernahMemblokirDiriSendiri() {
         assertFalse(BlockPolicy.blockedSet(rules, "cell", null, false, null, 1000, "me").contains("me"));
         assertEquals(s(), BlockPolicy.blockedSet(new ArrayList<Rule>(), "cell", null, true, none, 1000, "me"));
+    }
+
+    @Test public void blokirSaatHotspotMenyalaHanyaUntukAturanHot() {
+        List<Rule> r = Arrays.asList(
+            new Rule("h", "H", false, false, false, false, true),
+            new Rule("a", "A", true, false, false, false, false),
+            new Rule("me", "Aku", false, false, false, false, true));
+        assertEquals(s("a", "h"), BlockPolicy.blockedSet(r, "cell", "x", true, none, 1000, "me", true));
+        assertEquals(s("a"), BlockPolicy.blockedSet(r, "cell", "x", true, none, 1000, "me", false));
+        // jalur lama (tanpa parameter hotspot) = hotspot mati
+        assertEquals(s("a"), BlockPolicy.blockedSet(r, "cell", "x", true, none, 1000, "me"));
+        // tidak bergantung jenis jaringan, dan tidak pernah memblokir diri sendiri
+        assertEquals(s("h"), BlockPolicy.blockedSet(r, "wifi", "x", true, none, 1000, "me", true));
+    }
+
+    @Test public void identitasAplikasiSamaPadaProfilBerbeda() {
+        assertEquals(10123, BlockPolicy.appIdOfUid(1010123));
+        assertEquals(10123, BlockPolicy.appIdOfUid(2010123));
+        assertEquals(10123, BlockPolicy.appIdOfUid(10123));
+        assertEquals(1000, BlockPolicy.appIdOfUid(101000));
+    }
+
+    @Test public void paketSatuUidIkutMasukVpnBersamaPaketAturan() {
+        Map<String, Set<String>> aliases = Collections.singletonMap("a", s("a", "a.shared"));
+        assertEquals(s("a", "a.shared"),
+            BlockPolicy.blockedSet(rules, "cell", "x", true, none, 1000, "me", false, aliases));
+    }
+
+    @Test public void jadwalMendukungLintasTengahMalamDenganAkhirEksklusif() {
+        assertFalse(BlockPolicy.isWithinSchedule(8 * 60, 15 * 60, 7 * 60 + 59));
+        assertTrue(BlockPolicy.isWithinSchedule(8 * 60, 15 * 60, 8 * 60));
+        assertTrue(BlockPolicy.isWithinSchedule(8 * 60, 15 * 60, 14 * 60 + 59));
+        assertFalse(BlockPolicy.isWithinSchedule(8 * 60, 15 * 60, 15 * 60));
+        assertTrue(BlockPolicy.isWithinSchedule(22 * 60, 6 * 60, 23 * 60));
+        assertTrue(BlockPolicy.isWithinSchedule(22 * 60, 6 * 60, 5 * 60 + 59));
+        assertFalse(BlockPolicy.isWithinSchedule(22 * 60, 6 * 60, 6 * 60));
+        assertFalse(BlockPolicy.isWithinSchedule(8 * 60, 8 * 60, 8 * 60));
     }
 }

@@ -114,7 +114,7 @@ object UsageSync {
                         // kalau tidak, baris dengan kunci sama saling menimpa dan angkanya terlalu kecil.
                         val acc = when {
                             uid == NetworkStats.Bucket.UID_TETHERING -> tether.getOrPut(TetherKey(h, netName)) { Acc() }
-                            uid >= 0 -> apps.getOrPut(AppKey(uid, h, netName)) { Acc() }
+                            uid >= 0 -> apps.getOrPut(AppKey(BlockPolicy.appIdOfUid(uid), h, netName)) { Acc() }
                             else -> null   // UID_REMOVED dll: jadi bagian "Lainnya"
                         }
                         if (acc != null) { acc.rx += bucket.rxBytes; acc.tx += bucket.txBytes }
@@ -158,7 +158,7 @@ object UsageSync {
         try {
             val pm = c.packageManager
             val rows = ArrayList<AppInfo>()
-            for ((uid, group) in installedApps(pm).groupBy { it.uid }) {
+            for ((uid, group) in installedApps(pm).groupBy { BlockPolicy.appIdOfUid(it.uid) }) {
                 // Beberapa paket bisa berbagi satu UID: pilih yang punya ikon peluncur, kalau tidak ada, nama paket terkecil.
                 val rep = if (group.size == 1) group[0]
                     else group.firstOrNull { pm.getLaunchIntentForPackage(it.packageName) != null }

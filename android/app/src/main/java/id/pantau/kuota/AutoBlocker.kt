@@ -1,14 +1,28 @@
 package id.pantau.kuota
 
 import android.content.Context
+import java.util.Calendar
 
 /**
  * Blokir otomatis saat batas aplikasi terlewati. HANYA untuk aplikasi yang aturannya punya autoBlock = true,
  * yang di UI baru bisa dinyalakan setelah pengguna menyetujui secara eksplisit.
  */
 object AutoBlocker {
+    /** Rentang lokal [mulai, selesai); sama dengan UI dan mendukung rentang yang melewati tengah malam. */
+    fun scheduleActive(cfg: QuotaConfig, now: Long = System.currentTimeMillis()): Boolean {
+        val schedule = cfg.blockSchedule
+        if (!schedule.enabled || schedule.startMinute == schedule.endMinute) return !schedule.enabled
+        val calendar = Calendar.getInstance().apply { timeInMillis = now }
+        val minute = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+        return BlockPolicy.isWithinSchedule(schedule.startMinute, schedule.endMinute, minute)
+    }
+
+    fun blockingEnabled(cfg: QuotaConfig, now: Long = System.currentTimeMillis()): Boolean =
+        cfg.blockOn && scheduleActive(cfg, now)
+
     fun apply(c: Context, cfg: QuotaConfig, st: QuotaStatus) {
-        if (!cfg.blockOn) return
+        SafetyActions.apply(c, cfg, st)
+        if (!blockingEnabled(cfg)) return
         val allowed = HashMap<String, BlockPolicy.Rule>()
         for (r in cfg.blockRules) if (r.autoBlock) allowed[r.pkg] = r
         if (allowed.isEmpty()) return
@@ -34,6 +48,6 @@ object AutoBlocker {
             Notifier.notifyInfo(c, "autoblock.$pkg", "$label diblokir",
                 "Batas pemakaiannya terlewati, jadi internetnya diblokir sampai periode berganti. Buka Pantau Kuota untuk membukanya.")
         }
-        if (changed) BlockerVpnService.ensure(c)
+        if (changed) BlockerFactory.ensure(c)
     }
 }
