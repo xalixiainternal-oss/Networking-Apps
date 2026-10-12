@@ -73,7 +73,8 @@ public class BlockPolicyTest {
 
     @Test public void paketSatuUidIkutMasukVpnBersamaPaketAturan() {
         Map<String, Set<String>> aliases = Collections.singletonMap("a", s("a", "a.shared"));
-        assertEquals(s("a", "a.shared"),
+        // rules juga berisi c (bg, tidak di layar) dan d (seluler), jadi ikut terblokir; yang diuji: alias a ikut masuk.
+        assertEquals(s("a", "a.shared", "c", "d"),
             BlockPolicy.blockedSet(rules, "cell", "x", true, none, 1000, "me", false, aliases));
     }
 
