@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import rikka.shizuku.Shizuku
 
 enum class ShizukuState(val wireValue: String) {
     NOT_INSTALLED("not_installed"),

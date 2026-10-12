@@ -173,10 +173,12 @@ class BlockerVpnService : VpnService() {
             clearShizukuRules(stopAfter = true)
             return
         }
-        val set = if (AutoBlocker.scheduleActive(cfg)) {
+        val scheduled = if (AutoBlocker.scheduleActive(cfg)) {
             BlockPolicy.blockedSet(cfg.blockRules, net, fg, screenOn, BlockStore.autoBlocked(this),
                 System.currentTimeMillis(), packageName, hotspotOn, packageAliases())
         } else emptySet()
+        val manual = BlockStore.manualBlocked(this).filter { it != packageName }
+        val set: Set<String> = if (manual.isEmpty()) scheduled else java.util.TreeSet(scheduled + manual)
         val wantsShizuku = cfg.blockerMode != "vpn" && ShizukuBlocker.isReady()
         if (wantsShizuku && shizukuFailure && shizukuDesired == set) {
             establishVpnFallback(set)

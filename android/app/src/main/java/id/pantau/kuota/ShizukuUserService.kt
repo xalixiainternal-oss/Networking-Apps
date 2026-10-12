@@ -19,7 +19,7 @@ internal object ShellOperation {
     const val GET_PACKAGE_NETWORKING = 11
 }
 
-internal data class ShellResult(val exitCode: Int, val output: String, val error: String) {
+data class ShellResult(val exitCode: Int, val output: String, val error: String) {
     val ok: Boolean get() = exitCode == 0
 }
 

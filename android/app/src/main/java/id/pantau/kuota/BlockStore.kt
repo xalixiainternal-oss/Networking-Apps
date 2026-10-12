@@ -28,5 +28,26 @@ object BlockStore {
         sp(c).edit().remove("auto.$pkg").putLong("released.$pkg", maxOf(until, System.currentTimeMillis())).apply()
     }
 
+    /** Blokir manual (dari tombol/antarmuka): berlaku sampai dibuka pengguna, tidak mengikuti jadwal. */
+    fun manualBlocked(c: Context): Set<String> {
+        val out = HashSet<String>()
+        for ((k, v) in sp(c).all) {
+            if (k.startsWith("manual.") && v == true) out.add(k.removePrefix("manual."))
+        }
+        return out
+    }
+
+    fun putManual(c: Context, pkg: String, blocked: Boolean) {
+        val e = sp(c).edit()
+        if (blocked) e.putBoolean("manual.$pkg", true) else e.remove("manual.$pkg")
+        e.apply()
+    }
+
+    fun clearManual(c: Context) {
+        val e = sp(c).edit()
+        for (k in sp(c).all.keys) if (k.startsWith("manual.")) e.remove(k)
+        e.apply()
+    }
+
     fun clear(c: Context) { sp(c).edit().clear().apply() }
 }

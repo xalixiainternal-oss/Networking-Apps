@@ -106,6 +106,7 @@ aplikasi yang sudah dihapus dan proses sistem jatuh ke "Lainnya"; kuota malam di
 
 ## v0.7 — perbaikan build & ketahanan Shizuku
 - **Perbaikan build:** `buildFeatures { buildConfig true }` diaktifkan (AGP 8 tidak membuatnya otomatis; `ShizukuClient` memakai `BuildConfig`).
+- **AIDL:** `execute` diberi nomor transaksi `= 1` (AIDL mewajibkan semua method bernomor bila `destroy() = 16777114` sudah bernomor).
 - **Gradle Wrapper:** distribusi `-bin` dan `networkTimeout=60000` agar unduhan tidak timeout di jaringan lambat.
 - **`blockApp` aditif:** memblokir satu aplikasi lewat Shizuku tidak lagi membuka blokir aplikasi lain yang sudah tercatat.
 - **`ShellOutputParser`:** pembacaan keluaran `cmd connectivity get-*` dipusatkan dan diuji (`ShellOutputParserTest`); bila format tidak dikenali hasilnya `null` dan app kembali ke VPN.
