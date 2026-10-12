@@ -130,7 +130,8 @@ class ShizukuPlugin : Plugin() {
         val active = BlockerVpnService.activeBackend
         call.resolve(JSObject().put("requested", cfg.blockerMode)
             .put("active", active)
-            .put("fallback", cfg.blockerMode != "vpn" && active == "vpn"))
+            .put("fallback", cfg.blockerMode != "vpn" && active == "vpn")
+            .put("reason", BlockerVpnService.lastShizukuError))
     }
 
     private fun emitState() {

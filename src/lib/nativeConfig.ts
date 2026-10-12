@@ -10,6 +10,7 @@ export function buildNativeConfig(s: Settings) {
     cellQuota: quotaBytes(s),
     wifiQuota: amountBytes(s.wifiQuota, s.base),
     night: { on: s.night.on, startHour: s.night.startHour, endHour: s.night.endHour, quota: amountBytes(s.night.quota, s.base) },
+    dailyLimit: { quota: amountBytes(s.dailyLimit.quota, s.base), step: amountBytes(s.dailyLimit.step, s.base), cutoff: amountBytes(s.dailyLimit.cutoff, s.base) },
     hotspot: { daily: amountBytes(s.hotspot.daily, s.base), monthly: amountBytes(s.hotspot.monthly, s.base) },
     appLimits: Object.entries(s.appLimits)
       .map(([pkg, l]) => ({ pkg, label: l.label, daily: amountBytes(l.daily, s.base), monthly: amountBytes(l.monthly, s.base) }))

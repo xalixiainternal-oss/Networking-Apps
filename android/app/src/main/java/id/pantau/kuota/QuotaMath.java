@@ -84,6 +84,21 @@ public final class QuotaMath {
         return Math.max(0L, cellTotal - Math.min(nightUsed, nightQuota));
     }
 
+    /**
+     * Berapa langkah penuh (kelipatan {@code step}) pemakaian sudah melewati batas harian.
+     * 0 = belum melewati batas, atau ada langkah/batas yang tidak valid. Contoh: batas 1000, langkah 200 →
+     * pakai 1000..1199 = 0, 1200..1399 = 1, 1400 = 2. (Ambang batas itu sendiri ditangani peringatan 100%.)
+     */
+    public static long overSteps(long used, long quota, long step) {
+        if (quota <= 0L || step <= 0L || used < quota) return 0L;
+        return (used - quota) / step;
+    }
+
+    /** Apakah pemakaian sudah melewati batas sebesar {@code cutoff} byte (cutoff <= 0 = pemutusan tidak dipakai). */
+    public static boolean cutoffReached(long used, long quota, long cutoff) {
+        return quota > 0L && cutoff > 0L && used >= quota + cutoff;
+    }
+
     public static String fmtBytes(long n, int base) {
         String[] u = base == 1024
                 ? new String[]{"B", "KiB", "MiB", "GiB", "TiB"}

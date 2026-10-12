@@ -26,7 +26,9 @@ internal object SafetyActions {
                 val blocker = ShizukuBlocker(context)
                 try {
                     restoreMobileDataIfNeeded(context, cfg, status, blocker)
+                    restoreDailyCutoffIfNeeded(context, cfg, status, blocker)
                     applyMobileData(context, cfg, status, blocker)
+                    applyDailyCutoff(context, cfg, status, blocker)
                     applyHotspot(context, cfg, status, blocker)
                     applyLimitedApps(context, cfg, status, blocker)
                 } catch (e: Exception) {
@@ -82,6 +84,63 @@ internal object SafetyActions {
             Log.w(TAG, "Pemadaman data seluler gagal: ${result.error}")
             Notifier.notifyInfo(context, "safety.mobile-failed", "Data seluler tidak dimatikan",
                 "Perintah sistem tidak didukung atau ditolak. Tindakan ini tidak akan dicoba lagi sampai sinkronisasi berikutnya.")
+        }
+    }
+
+    /** v0.8: matikan data seluler bila pemakaian hari ini melewati batas harian + cutoff. Sekali per hari. */
+    private suspend fun applyDailyCutoff(
+        context: Context,
+        cfg: QuotaConfig,
+        status: QuotaStatus,
+        blocker: ShizukuBlocker
+    ) {
+        val d = cfg.dailyLimit
+        if (d.quota <= 0L || d.cutoff <= 0L) return
+        val used = status.items.firstOrNull { it.kind == "cell-day" }?.used ?: return
+        if (!QuotaMath.cutoffReached(used, d.quota, d.cutoff)) return
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getLong("mobile_disabled_day", 0L) == status.dayStart) return
+        val manager = context.getSystemService(ConnectivityManager::class.java)
+        val active = manager.getNetworkCapabilities(manager.activeNetwork)
+        if (active?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) != true) return
+        val result = blocker.executeChecked(ShellOperation.MOBILE_DATA, enabled = false)
+        if (result.ok) {
+            prefs.edit().putLong("mobile_disabled_day", status.dayStart).apply()
+            Notifier.notifyInfo(context, "safety.daily-disabled", "Data seluler dimatikan",
+                "Batas harian + batas pemutusan tercapai. Data dinyalakan kembali otomatis besok pagi.")
+        } else {
+            Log.w(TAG, "Pemutusan data harian gagal: ${result.error}")
+            Notifier.notifyInfo(context, "safety.daily-failed", "Data seluler tidak dimatikan",
+                "Perintah sistem tidak didukung atau ditolak. Tindakan ini tidak diulang sampai sinkronisasi berikutnya.")
+        }
+    }
+
+    /** Nyalakan kembali data yang dimatikan batas harian saat hari berganti, atau saat fitur dimatikan. */
+    private suspend fun restoreDailyCutoffIfNeeded(
+        context: Context,
+        cfg: QuotaConfig,
+        status: QuotaStatus,
+        blocker: ShizukuBlocker
+    ) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val ownedDay = prefs.getLong("mobile_disabled_day", 0L)
+        if (ownedDay == 0L) return
+        val stillActive = cfg.dailyLimit.quota > 0L && cfg.dailyLimit.cutoff > 0L && status.dayStart <= ownedDay
+        if (stillActive) return
+        // Batas siklus yang juga memutus data tetap berlaku; jangan menyalakannya dari sini.
+        if (prefs.getLong("mobile_disabled_cycle", 0L) == status.cycleStart) {
+            prefs.edit().remove("mobile_disabled_day").apply()
+            return
+        }
+        val result = blocker.executeChecked(ShellOperation.MOBILE_DATA, enabled = true)
+        if (result.ok) {
+            prefs.edit().remove("mobile_disabled_day").apply()
+            Notifier.notifyInfo(context, "safety.daily-restored", "Data seluler dipulihkan",
+                "Data yang dimatikan batas harian telah dinyalakan kembali.")
+        } else {
+            Log.w(TAG, "Pemulihan data harian gagal: ${result.error}")
+            Notifier.notifyInfo(context, "safety.daily-restore-failed", "Data seluler perlu diperiksa",
+                "Pemulihan otomatis gagal. Periksa dan nyalakan data seluler secara manual.")
         }
     }
 

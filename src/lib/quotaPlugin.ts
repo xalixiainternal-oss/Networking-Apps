@@ -29,7 +29,7 @@ export interface AppHourRow {
 
 export interface LimitItem {
   id: string;
-  kind: 'cell' | 'night' | 'wifi' | 'hotspot-day' | 'hotspot-cycle' | 'app-day' | 'app-cycle';
+  kind: 'cell' | 'cell-day' | 'night' | 'wifi' | 'hotspot-day' | 'hotspot-cycle' | 'app-day' | 'app-cycle';
   title: string; used: number; quota: number; pct: number; level: 0 | 80 | 90 | 100;
   periodStart: number; periodEnd: number;
 }
@@ -61,7 +61,7 @@ export interface VpnState {
 export type ShizukuStateName = 'not_installed' | 'not_running' | 'permission_required' | 'ready';
 export interface ShizukuStatus { state: ShizukuStateName; ready: boolean; installed: boolean; message: string }
 export interface ShizukuGrantResult { name: string; granted: boolean; message: string }
-export interface BlockerBackend { requested: string; active: 'vpn' | 'shizuku'; fallback: boolean }
+export interface BlockerBackend { requested: string; active: 'vpn' | 'shizuku'; fallback: boolean; reason?: string }
 
 export interface QuotaPlugin {
   getPermissionStatus(): Promise<PermissionStatus>;

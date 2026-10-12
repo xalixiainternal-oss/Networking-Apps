@@ -109,13 +109,8 @@ class ShizukuBlocker(private val context: Context) : NetworkBlocker {
                 return@withContext BlockerResult(false, "Paket tidak terlihat atau tidak dapat dipetakan ke UID di profil ini.", "vpn")
             }
 
-            val probe = executeChecked(ShellOperation.CONNECTIVITY_HELP)
-            val help = (probe.output + probe.error).lowercase()
-            if (!probe.ok || !help.contains("set-package-networking-enabled") ||
-                !help.contains("get-package-networking-enabled") ||
-                (Build.VERSION.SDK_INT >= 33 && (!help.contains("set-chain3-enabled") || !help.contains("get-chain3-enabled")))) {
-                return@withContext BlockerResult(false, "Perintah firewall tidak terdeteksi di perangkat ini.", "vpn")
-            }
+            // Tidak lagi mensyaratkan teks `cmd connectivity help`: sebagian perangkat tidak mencantumkan perintah
+            // ini di bantuan padahal mendukungnya. Perintah dicoba langsung dan hasilnya diverifikasi per paket.
 
             val old = trackedPackages()
             val removed = old - safe
@@ -123,7 +118,7 @@ class ShizukuBlocker(private val context: Context) : NetworkBlocker {
                 val uid = packageUid(pkg)
                 if (uid == null) { removeTrackedPackage(pkg); continue }
                 val result = executeChecked(ShellOperation.SET_PACKAGE_NETWORKING, uid, pkg, true)
-                if (!result.ok) return@withContext BlockerResult(false, explain(result), "vpn")
+                if (!result.ok) return@withContext BlockerResult(false, "set-package-networking-enabled: " + explain(result), "vpn")
                 if (parsePackageAllowed(executeChecked(ShellOperation.GET_PACKAGE_NETWORKING, uid, pkg)) != true) {
                     return@withContext BlockerResult(false, "Aturan allow paket $pkg tidak dapat diverifikasi.", "vpn")
                 }
@@ -132,9 +127,12 @@ class ShizukuBlocker(private val context: Context) : NetworkBlocker {
 
             if (safe.isNotEmpty() && !chain3Owned()) {
                 val state = executeChecked(ShellOperation.GET_CHAIN3_STATE)
+                // Status tak terbaca: anggap mati tetapi jangan klaim kepemilikan (tidak akan dimatikan oleh app ini).
                 val chainAlreadyEnabled = parseChainEnabled(state)
-                    ?: return@withContext BlockerResult(false, "Status chain firewall tidak dapat dibaca dengan aman.", "vpn")
-                if (chainAlreadyEnabled) {
+                if (chainAlreadyEnabled == null) {
+                    val chain = executeChecked(ShellOperation.SET_CHAIN3, enabled = true)
+                    if (!chain.ok) return@withContext BlockerResult(false, "set-chain3-enabled: " + explain(chain), "vpn")
+                } else if (chainAlreadyEnabled) {
                     setChain3Owned(false)
                 } else {
                     // TODO: verify on target devices; OEM shell implementations can vary.
@@ -147,9 +145,10 @@ class ShizukuBlocker(private val context: Context) : NetworkBlocker {
                 val uid = targets[pkg] ?: continue
                 // TODO: test di perangkat; perintah package networking berasal dari Android Connectivity shell dan perlu verifikasi OEM/API.
                 val result = executeChecked(ShellOperation.SET_PACKAGE_NETWORKING, uid, pkg, false)
-                if (!result.ok) return@withContext BlockerResult(false, explain(result), "vpn")
-                if (parsePackageAllowed(executeChecked(ShellOperation.GET_PACKAGE_NETWORKING, uid, pkg)) != false) {
-                    return@withContext BlockerResult(false, "Aturan blokir paket $pkg tidak dapat diverifikasi.", "vpn")
+                if (!result.ok) return@withContext BlockerResult(false, "set-package-networking-enabled: " + explain(result), "vpn")
+                val check = executeChecked(ShellOperation.GET_PACKAGE_NETWORKING, uid, pkg)
+                if (parsePackageAllowed(check) != false) {
+                    return@withContext BlockerResult(false, "Blokir $pkg tidak terverifikasi (keluaran: " + (check.output + check.error).trim().take(80) + ")", "vpn")
                 }
                 trackPackage(pkg)
             }

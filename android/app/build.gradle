@@ -3,7 +3,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'com.google.devtools.ksp'
 
 def appVersionCodeValue = (project.findProperty("appVersionCode") ?: "1").toString().toInteger()
-def appVersionNameValue = (project.findProperty("appVersionName") ?: "0.7.0").toString()
+def appVersionNameValue = (project.findProperty("appVersionName") ?: "0.7.1").toString()
 
 android {
     namespace "id.pantau.kuota"

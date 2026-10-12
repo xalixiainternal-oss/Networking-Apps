@@ -6,7 +6,7 @@ import java.util.TimeZone
 
 data class LimitState(
     val id: String,
-    val kind: String,        // cell | night | wifi | hotspot-day | hotspot-cycle | app-day | app-cycle
+    val kind: String,        // cell | cell-day | night | wifi | hotspot-day | hotspot-cycle | app-day | app-cycle
     val title: String,
     val used: Long,
     val quota: Long,
@@ -54,6 +54,9 @@ object QuotaEngine {
         if (cfg.cellQuota > 0L) {
             val used = QuotaMath.mainUsed(cellTotal, nightUsed, if (cfg.nightOn) cfg.nightQuota else 0L)
             items.add(LimitState("cell", "cell", "Kuota seluler", used, cfg.cellQuota, cyc[0], cyc[1]))
+        }
+        if (cfg.dailyLimit.quota > 0L) {
+            items.add(LimitState("cell.day", "cell-day", "Batas harian seluler", dao.sumNet("cell", day0, to), cfg.dailyLimit.quota, day0, day0 + 24 * HOUR))
         }
         if (cfg.wifiQuota > 0L) {
             items.add(LimitState("wifi", "wifi", "Kuota Wi-Fi", dao.sumNet("wifi", cyc[0], to), cfg.wifiQuota, cyc[0], cyc[1]))

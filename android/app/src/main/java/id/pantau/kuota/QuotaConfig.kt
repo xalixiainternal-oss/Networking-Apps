@@ -11,6 +11,11 @@ data class SafetyConfig(
     val stopLimitedApps: Boolean = false
 )
 
+/** v0.8: batas harian seluler. step = kelipatan peringatan setelah batas lewat; cutoff = tambahan di atas batas sebelum data dimatikan (0 = tidak dimatikan). */
+data class DailyLimit(val quota: Long = 0L, val step: Long = DEFAULT_STEP, val cutoff: Long = 0L) {
+    companion object { const val DEFAULT_STEP = 200_000_000L }
+}
+
 /** Konfigurasi yang diisi pengguna di UI, disalin ke SharedPreferences supaya Worker/Service bisa membacanya tanpa WebView. */
 data class QuotaConfig(
     val base: Int = 1000,
@@ -23,6 +28,7 @@ data class QuotaConfig(
     val nightQuota: Long = 0L,
     val hotspotDaily: Long = 0L,
     val hotspotMonthly: Long = 0L,
+    val dailyLimit: DailyLimit = DailyLimit(),
     val appLimits: List<AppLimit> = emptyList(),
     val alertsOn: Boolean = true,
     val persistentOn: Boolean = true,
@@ -51,6 +57,7 @@ data class QuotaConfig(
             val hot = o.optJSONObject("hotspot")
             val schedule = o.optJSONObject("blockSchedule")
             val safety = o.optJSONObject("safety")
+            val daily = o.optJSONObject("dailyLimit")
             val limits = ArrayList<AppLimit>()
             val arr = o.optJSONArray("appLimits")
             if (arr != null) {
@@ -89,6 +96,12 @@ data class QuotaConfig(
                 nightQuota = (night?.optLong("quota", 0L) ?: 0L).coerceAtLeast(0L),
                 hotspotDaily = (hot?.optLong("daily", 0L) ?: 0L).coerceAtLeast(0L),
                 hotspotMonthly = (hot?.optLong("monthly", 0L) ?: 0L).coerceAtLeast(0L),
+                dailyLimit = DailyLimit(
+                    quota = (daily?.optLong("quota", 0L) ?: 0L).coerceAtLeast(0L),
+                    step = (daily?.optLong("step", DailyLimit.DEFAULT_STEP) ?: DailyLimit.DEFAULT_STEP)
+                        .let { if (it <= 0L) DailyLimit.DEFAULT_STEP else it },
+                    cutoff = (daily?.optLong("cutoff", 0L) ?: 0L).coerceAtLeast(0L)
+                ),
                 appLimits = limits,
                 alertsOn = o.optBoolean("alerts", true),
                 persistentOn = o.optBoolean("persistent", true),

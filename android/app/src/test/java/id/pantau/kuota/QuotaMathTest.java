@@ -97,4 +97,23 @@ public class QuotaMathTest {
         assertEquals("1,00 MiB", QuotaMath.fmtBytes(1_048_576, 1024));
         assertEquals("2,50 MB/s", QuotaMath.fmtSpeed(2_500_000, 1000));
     }
+
+    @Test public void langkahPeringatanSetelahBatasHarian() {
+        long q = 1_000_000_000L, step = 200_000_000L;
+        assertEquals(0L, QuotaMath.overSteps(999_999_999L, q, step));
+        assertEquals(0L, QuotaMath.overSteps(q, q, step));
+        assertEquals(0L, QuotaMath.overSteps(1_199_999_999L, q, step));
+        assertEquals(1L, QuotaMath.overSteps(1_200_000_000L, q, step));
+        assertEquals(2L, QuotaMath.overSteps(1_450_000_000L, q, step));
+        assertEquals(0L, QuotaMath.overSteps(5L * q, 0L, step));
+        assertEquals(0L, QuotaMath.overSteps(5L * q, q, 0L));
+    }
+
+    @Test public void pemutusanData() {
+        long q = 1_000_000_000L;
+        assertFalse(QuotaMath.cutoffReached(2L * q, q, 0L));
+        assertFalse(QuotaMath.cutoffReached(2L * q, 0L, 400_000_000L));
+        assertFalse(QuotaMath.cutoffReached(1_399_999_999L, q, 400_000_000L));
+        assertTrue(QuotaMath.cutoffReached(1_400_000_000L, q, 400_000_000L));
+    }
 }

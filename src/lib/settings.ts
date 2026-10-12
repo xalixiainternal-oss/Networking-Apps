@@ -14,6 +14,8 @@ export interface Settings {
   wifiQuota: Amount;
   /** Kuota malam: pemakaian seluler di jam malam dihitung dulu ke sini. */
   night: { on: boolean; startHour: number; endHour: number; quota: Amount };
+  /** Batas harian seluler (0 = tidak dipakai). step = peringatan tiap kelipatan ini setelah batas lewat; cutoff = tambahan di atas batas sebelum data dimatikan (0 = tidak dimatikan, perlu Shizuku). */
+  dailyLimit: { quota: Amount; step: Amount; cutoff: Amount };
   /** Batas hotspot (0 = tanpa batas). */
   hotspot: { daily: Amount; monthly: Amount };
   /** Batas per aplikasi, kunci = nama paket. Dihitung dari data seluler. */
@@ -42,6 +44,7 @@ export const DEFAULTS: Settings = {
   quotaValue: 0, quotaUnit: 'GB', resetDay: 1, base: 1000, theme: 'system',
   wifiQuota: A0(),
   night: { on: false, startHour: 0, endHour: 5, quota: A0() },
+  dailyLimit: { quota: A0(), step: { v: 200, u: 'MB' }, cutoff: A0() },
   hotspot: { daily: A0(), monthly: A0() },
   appLimits: {},
   alerts: true, persistent: true,
@@ -55,6 +58,11 @@ const num = (x: unknown, d: number) => (typeof x === 'number' && Number.isFinite
 const amount = (x: unknown): Amount => {
   const o = (x ?? {}) as Partial<Amount>;
   return { v: Math.max(0, num(o.v, 0)), u: o.u === 'MB' ? 'MB' : 'GB' };
+};
+/** Langkah peringatan harus > 0; nilai kosong/rusak kembali ke 200 MB. */
+const stepAmount = (x: unknown): Amount => {
+  const a = amount(x);
+  return a.v > 0 ? a : { v: 200, u: 'MB' };
 };
 const hour = (x: unknown, d: number) => Math.min(23, Math.max(0, Math.floor(num(x, d))));
 const clock = (x: unknown, d: string) => typeof x === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x) ? x : d;
@@ -89,6 +97,7 @@ export function mergeSettings(raw: unknown): Settings {
       startHour: hour(r.night?.startHour, 0), endHour: hour(r.night?.endHour, 5),
       quota: amount(r.night?.quota),
     },
+    dailyLimit: { quota: amount(r.dailyLimit?.quota), step: stepAmount(r.dailyLimit?.step), cutoff: amount(r.dailyLimit?.cutoff) },
     hotspot: { daily: amount(r.hotspot?.daily), monthly: amount(r.hotspot?.monthly) },
     appLimits: limits,
     alerts: r.alerts !== false,

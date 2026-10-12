@@ -68,9 +68,10 @@ export function Dashboard({ onGoToApps }: DashboardProps) {
   // Angka kuota datang dari Kotlin (sudah memperhitungkan kuota malam & Wi-Fi), sama dengan yang dipakai notifikasi.
   const main  = findItem(status, 'cell');
   const night = findItem(status, 'night');
+  const dayCap = findItem(status, 'cell.day');
   const wifiQ = findItem(status, 'wifi');
   const fc    = main ? forecast(main.used, main.quota, main.periodStart, main.periodEnd, now) : null;
-  const anyQuota = Boolean(main || night || wifiQ);
+  const anyQuota = Boolean(main || night || wifiQ || dayCap);
   const allowance = main && main.quota > 0 && main.quota > main.used
     ? dailyAllowance(main.quota - main.used, now, main.periodEnd) : null;
   const radarDays = main ? daysUntilQuotaEmpty(main.used, main.quota, main.periodStart, now) : null;
@@ -139,6 +140,12 @@ export function Dashboard({ onGoToApps }: DashboardProps) {
               {night && (
                 <ProgressBar percent={night.pct}
                   label={`Malam ${String(st.night.startHour).padStart(2, '0')}:00–${String(st.night.endHour).padStart(2, '0')}:00 · ${fmtBytes(night.used, st.base)} / ${fmtBytes(night.quota, st.base)}`} />
+              )}
+              {dayCap && (
+                <div className="grid gap-1">
+                  <ProgressBar percent={Math.min(100, dayCap.pct)} label={`Batas harian ${fmtBytes(dayCap.used, st.base)} / ${fmtBytes(dayCap.quota, st.base)}`} />
+                  {dayCap.used > dayCap.quota && <p className="m-0 nb-num">LEWAT {fmtBytes(dayCap.used - dayCap.quota, st.base)} DARI BATAS HARI INI</p>}
+                </div>
               )}
               {wifiQ && <ProgressBar percent={wifiQ.pct} label={`Wi-Fi ${fmtBytes(wifiQ.used, st.base)} / ${fmtBytes(wifiQ.quota, st.base)}`} />}
             </div>

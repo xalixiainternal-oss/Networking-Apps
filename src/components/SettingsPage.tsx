@@ -336,6 +336,25 @@ function SettingsContent() {
         </Card>
 
         <Card>
+          <h2 className="m-0 mb-3 text-lg font-bold">Batas harian seluler</h2>
+          <div className="grid gap-4">
+            <AmountField id="batas-harian" label="BATAS PER HARI (0 = TIDAK DIPAKAI)" value={s.dailyLimit.quota}
+              onChange={(quota) => updateSettings({ dailyLimit: { ...s.dailyLimit, quota } })} />
+            {s.dailyLimit.quota.v > 0 && (
+              <>
+                <AmountField id="batas-harian-langkah" label="PERINGATAN TIAP KELIPATAN SETELAH BATAS LEWAT" value={s.dailyLimit.step}
+                  onChange={(step) => updateSettings({ dailyLimit: { ...s.dailyLimit, step } })} />
+                <AmountField id="batas-harian-cutoff" label="MATIKAN DATA SETELAH LEWAT SEBESAR (0 = JANGAN)" value={s.dailyLimit.cutoff}
+                  onChange={(cutoff) => updateSettings({ dailyLimit: { ...s.dailyLimit, cutoff } })} />
+                <p className="m-0 text-sm">
+                  Contoh: batas 1 GB dan langkah 200 MB → peringatan di 1 GB, lalu tiap tambahan 200 MB. Bila "matikan data" diisi, data seluler dimatikan otomatis setelah pemakaian melewati batas sebesar itu dan dinyalakan lagi besok. Pemutusan otomatis butuh Shizuku siap; tanpa itu hanya ada peringatan. Peringatan mengikuti saklar notifikasi di bawah dan bisa tertunda sampai data disinkronkan.
+                </p>
+              </>
+            )}
+          </div>
+        </Card>
+
+        <Card>
           <h2 className="m-0 mb-3 text-lg font-bold">Kuota malam</h2>
           <Toggle checked={s.night.on} onChange={(on) => updateSettings({ night: { ...s.night, on } })}
             label="Pakai kuota malam" hint="Pemakaian seluler di jam malam dihitung dulu ke kuota malam, baru sisanya ke kuota utama." />
@@ -367,7 +386,7 @@ function SettingsContent() {
           <h2 className="m-0 mb-3 text-lg font-bold">Notifikasi</h2>
           <div className="grid gap-3">
             <Toggle checked={s.alerts} onChange={(alerts) => updateSettings({ alerts })}
-              label="Peringatan 80%, 90%, 100%" hint="Untuk kuota, hotspot, dan batas per aplikasi. Tiap ambang hanya sekali per periode." />
+              label="Peringatan 80%, 90%, 100%" hint="Untuk kuota, batas harian, hotspot, dan batas per aplikasi. Tiap ambang hanya sekali per periode; batas harian juga memberi peringatan tiap kelipatan setelah terlewati." />
             <Toggle checked={s.persistent} onChange={(persistent) => { updateSettings({ persistent }); if (persistent) void Quota.requestNotifications(); }}
               label="Notifikasi tetap" hint="Menampilkan kecepatan, pemakaian hari ini, dan sisa kuota. Memakai layanan latar yang hanya aktif saat layar menyala." />
           </div>

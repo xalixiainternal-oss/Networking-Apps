@@ -63,7 +63,35 @@ object Notifier {
                 changed = true
             }
         }
+        if (notifyOverLimit(c, cfg, st, sp, ed)) changed = true
         if (changed) ed.apply()
+    }
+
+    /**
+     * v0.8: setelah batas harian seluler terlewati, kirim peringatan tiap kelipatan {@code step} (mis. 200 MB).
+     * Status disimpan "<awalHari>:<kuota>:<langkah>:<n>"; hanya n yang LEBIH BESAR dari yang sudah diberi tahu
+     * yang dikirim, jadi lonjakan besar antar-sinkronisasi menghasilkan satu notifikasi, bukan banyak.
+     */
+    private fun notifyOverLimit(c: Context, cfg: QuotaConfig, st: QuotaStatus, sp: android.content.SharedPreferences, ed: android.content.SharedPreferences.Editor): Boolean {
+        val d = cfg.dailyLimit
+        val s = st.items.firstOrNull { it.kind == "cell-day" } ?: return false
+        val n = QuotaMath.overSteps(s.used, s.quota, d.step)
+        if (n <= 0L) return false
+        val key = "cell.day.over"
+        val parts = (sp.getString(key, null) ?: "").split(":")
+        val prev = if (parts.size == 4 && parts[0] == s.periodStart.toString() && parts[1] == s.quota.toString() && parts[2] == d.step.toString())
+            parts[3].toLongOrNull() ?: 0L else 0L
+        if (n <= prev || !canPost(c)) return false
+        val over = s.used - s.quota
+        val tail = when {
+            d.cutoff <= 0L -> "Matikan data seluler bila ingin berhenti memakai paket."
+            s.used >= s.quota + d.cutoff -> "Batas pemutusan otomatis tercapai."
+            else -> "Data seluler akan dimatikan otomatis setelah ${QuotaMath.fmtBytes(s.quota + d.cutoff - s.used, cfg.base)} lagi (perlu Shizuku)."
+        }
+        notifyInfo(c, key, "Batas harian lewat ${QuotaMath.fmtBytes(over, cfg.base)}",
+            "Hari ini terpakai ${QuotaMath.fmtBytes(s.used, cfg.base)} dari batas ${QuotaMath.fmtBytes(s.quota, cfg.base)}. $tail")
+        ed.putString(key, "${s.periodStart}:${s.quota}:${d.step}:$n")
+        return true
     }
 
     /** Notifikasi informasi sederhana (kanal peringatan). */

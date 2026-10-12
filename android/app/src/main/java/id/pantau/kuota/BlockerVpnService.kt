@@ -57,6 +57,7 @@ class BlockerVpnService : VpnService() {
     @Volatile private var shizukuFailure = false
     @Volatile private var shizukuGeneration = 0
     @Volatile private var shizukuCleanupPending = false
+    @Volatile private var shizukuFailedAt = 0L
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
@@ -180,17 +181,14 @@ class BlockerVpnService : VpnService() {
         val manual = BlockStore.manualBlocked(this).filter { it != packageName }
         val set: Set<String> = if (manual.isEmpty()) scheduled else java.util.TreeSet(scheduled + manual)
         val wantsShizuku = cfg.blockerMode != "vpn" && ShizukuBlocker.isReady()
-        if (wantsShizuku && shizukuFailure && shizukuDesired == set) {
-            establishVpnFallback(set)
+        val cooling = shizukuFailedAt != 0L && System.currentTimeMillis() - shizukuFailedAt < SHIZUKU_RETRY_MS
+        if (wantsShizuku && ((shizukuFailure && shizukuDesired == set) || cooling)) {
+            establishVpnFallback(set)   // Shizuku baru saja gagal: tetap di VPN, jangan putus-sambung tiap perubahan jaringan
             return
         }
         if (wantsShizuku) {
-            activeBackend = "vpn"
-            closeTun()
-            current = set
-            blockedCount = set.size
             if (shizukuDesired == set && (shizukuBusy || shizukuApplied)) return
-            applyShizukuRules(set)
+            applyShizukuRules(set)       // VPN lama dibiarkan sampai aturan Shizuku terbukti berlaku
             return
         }
         clearShizukuRules()
@@ -220,13 +218,22 @@ class BlockerVpnService : VpnService() {
             shizukuBusy = false
             shizukuApplied = result.ok
             shizukuFailure = !result.ok
-            if (result.ok) activeBackend = "shizuku"
-            if (!result.ok) ShizukuBlocker(this@BlockerVpnService).clearAllRules()
+            if (result.ok) { activeBackend = "shizuku"; shizukuFailedAt = 0L; lastShizukuError = "" }
+            if (!result.ok) {
+                shizukuFailedAt = System.currentTimeMillis()
+                lastShizukuError = result.message
+                ShizukuBlocker(this@BlockerVpnService).clearAllRules()
+            }
             handler.post {
-                if (!result.ok) {
+                if (generation != shizukuGeneration) return@post
+                if (result.ok) {
+                    closeTun()               // baru sekarang VPN pengganti boleh ditutup
+                    current = set
+                    blockedCount = set.size
+                } else {
                     Log.w(TAG, "Firewall Shizuku gagal; beralih ke VPN: ${result.message}")
                     Notifier.notifyInfo(this@BlockerVpnService, "shizuku.firewall-fallback", "Mode VPN digunakan",
-                        "Perintah firewall Shizuku gagal atau tidak didukung. Pemblokiran beralih ke VPN lokal; aturan Shizuku lama mungkin perlu dibersihkan saat Shizuku aktif kembali.")
+                        "Perintah firewall Shizuku gagal. Penyebab: ${result.message.take(160)}")
                 }
                 recompute()
             }
@@ -335,6 +342,8 @@ class BlockerVpnService : VpnService() {
         @Volatile var blockedCount = 0
         @Volatile var revokedAt = 0L
         @Volatile var activeBackend = "vpn"
+        @Volatile var lastShizukuError = ""
+        private const val SHIZUKU_RETRY_MS = 5 * 60_000L
         val dropped = AtomicLong(0L)
 
         fun prepared(c: Context): Boolean = VpnService.prepare(c) == null

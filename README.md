@@ -1,7 +1,7 @@
 # Xai Network
 
 Pemantau kuota & hotspot untuk Android. Data hanya di perangkat; app **tidak punya izin INTERNET**.
-Status: **v0.7** (blokir aplikasi lewat VPN lokal atau Shizuku eksperimental, jadwal blokir, kunci PIN Pengaturan, prediksi sisa kuota, jatah aman per hari, perbandingan minggu, pintasan USSD).
+Status: **v0.8.0** (batas harian seluler dengan peringatan tiap kelipatan, blokir aplikasi lewat VPN lokal atau Shizuku eksperimental, jadwal blokir, kunci PIN Pengaturan, prediksi sisa kuota, jatah aman per hari, perbandingan minggu, pintasan USSD).
 
 ## Build lokal
 ```
@@ -111,3 +111,15 @@ aplikasi yang sudah dihapus dan proses sistem jatuh ke "Lainnya"; kuota malam di
 - **`blockApp` aditif:** memblokir satu aplikasi lewat Shizuku tidak lagi membuka blokir aplikasi lain yang sudah tercatat.
 - **`ShellOutputParser`:** pembacaan keluaran `cmd connectivity get-*` dipusatkan dan diuji (`ShellOutputParserTest`); bila format tidak dikenali hasilnya `null` dan app kembali ke VPN.
 - **Belum teruji di perangkat:** `set-package-networking-enabled` / `set-chain3-enabled` (Android 13+, bisa beda per OEM). Uji manual: aktifkan Shizuku, blokir satu aplikasi, cek `cmd connectivity get-package-networking-enabled <paket>`.
+
+### v0.7.1
+- Firewall Shizuku tidak lagi mensyaratkan teks `cmd connectivity help`; perintah dicoba langsung lalu diverifikasi.
+- VPN pengganti tidak ditutup sebelum aturan Shizuku terbukti berlaku, dan setelah gagal app bertahan di VPN selama 5 menit (tidak putus-sambung tiap jaringan berubah, penyebab notifikasi "Terputus dari VPN yang selalu aktif").
+- Notifikasi "Mode VPN digunakan" kini menyebut penyebab kegagalan; `getBlockerBackend` juga mengembalikan `reason`.
+
+## v0.8 — batas harian seluler
+**Cara kerja.** Di Pengaturan → *Batas harian seluler* kamu mengisi batas per hari (mis. 1 GB), langkah peringatan (bawaan 200 MB), dan, opsional, batas pemutusan. Pemakaian seluler hari ini (00:00 waktu lokal) dihitung di `QuotaEngine` sebagai item `cell.day`, sehingga ikut peringatan 80/90/100% yang sudah ada dan tampil di Dashboard.
+**Peringatan berkelanjutan.** Setelah batas terlewati, `Notifier` mengirim notifikasi tiap kelipatan langkah (batas 1 GB, langkah 200 MB → 1,2 GB, 1,4 GB, …). Hanya langkah yang lebih besar dari yang sudah diberitahukan yang dikirim, jadi lonjakan antar-sinkronisasi menghasilkan satu notifikasi. Status disimpan per hari dan direset bila batas/langkah diubah. Logika hitung: `QuotaMath.overSteps` (diuji).
+**Matikan data otomatis (opsional, mati bawaan).** Bila "matikan data setelah lewat sebesar" > 0 dan Shizuku siap, `SafetyActions` mematikan data seluler sekali per hari saat pemakaian ≥ batas + nilai itu (hanya bila jaringan aktif seluler), lalu menyalakannya lagi saat hari berganti atau fitur dimatikan. Bila batas siklus juga sedang memutus data, data tidak dinyalakan dari sini. Tanpa Shizuku hanya ada peringatan.
+**Batasan.** Angka mengikuti data yang sudah disinkronkan (tiap jam, lebih sering saat layar menyala dan notifikasi tetap aktif), jadi peringatan bisa terlambat dari pemakaian sebenarnya. Perintah mematikan data lewat Shizuku bergantung OEM dan belum teruji di perangkat.
+
