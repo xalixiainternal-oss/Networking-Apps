@@ -24,7 +24,7 @@ data class PrankClient(
 
 class PrankServer(
     private val gatewayIp: String,
-    private val config: PrankServerConfig,
+    internal val config: PrankServerConfig,
     private val onClientEvent: (PrankClient) -> Unit,
 ) {
     companion object {
