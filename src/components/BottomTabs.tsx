@@ -1,17 +1,18 @@
-import { LayoutDashboard, AppWindow, Wifi, Settings } from 'lucide-react';
+import { LayoutDashboard, AppWindow, Wifi, Settings, Skull } from 'lucide-react';
 
-export type TabId = 'dashboard' | 'aplikasi' | 'hotspot' | 'pengaturan';
+export type TabId = 'dashboard' | 'aplikasi' | 'hotspot' | 'prank' | 'pengaturan';
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { id: 'aplikasi', label: 'Aplikasi', Icon: AppWindow },
   { id: 'hotspot', label: 'Hotspot', Icon: Wifi },
+  { id: 'prank', label: 'Prank', Icon: Skull },
   { id: 'pengaturan', label: 'Pengaturan', Icon: Settings },
 ] as const;
 
 export function BottomTabs({ active, onChange }: { active: TabId; onChange: (t: TabId) => void }) {
   return (
     <nav aria-label="Navigasi utama" className="fixed bottom-0 inset-x-0 safe-bottom bg-bg border-t-[3px] border-[var(--border)]">
-      <ul className="grid grid-cols-4 gap-2 p-2 m-0 list-none">
+      <ul className="grid grid-cols-5 gap-2 p-2 m-0 list-none">
         {TABS.map(({ id, label, Icon }) => {
           const on = id === active;
           return (

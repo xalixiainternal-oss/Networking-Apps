@@ -59,6 +59,24 @@ internal object ShizukuServiceClient {
             }
         }
 
+    /** Jalankan argv bebas (untuk PRANK_SHELL / iptables). */
+    suspend fun execute(operation: Int, rawArgv: List<String>): ShellResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val api = awaitService()
+                    ?: return@withContext ShellResult(-1, "", "Shizuku/UserService tidak merespons.")
+                val response = api.executeArgv(operation, rawArgv.toTypedArray())
+                if (response.size < 3) return@withContext ShellResult(-1, "", "Respons UserService tidak valid.")
+                ShellResult(response[0].toIntOrNull() ?: -1, response[1].orEmpty(), response[2].orEmpty())
+            } catch (e: Exception) {
+                Log.e(TAG, "Panggilan Shizuku argv gagal (operasi $operation).", e)
+                synchronized(lock) { remote = null; binding = false }
+                try { Shizuku.unbindUserService(args, connection, true) }
+                catch (unbindError: Exception) { Log.w(TAG, "Gagal melepas UserService setelah putus.", unbindError) }
+                ShellResult(-1, "", "${e.javaClass.simpleName}: ${e.message ?: "gagal"}")
+            }
+        }
+
     private suspend fun awaitService(): IShellService? {
         remote?.let { return it }
         if (!safeReady()) return null

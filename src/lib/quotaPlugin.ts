@@ -147,3 +147,52 @@ const webShizuku: ShizukuPlugin = {
 };
 
 export const ShizukuControl: ShizukuPlugin = Capacitor.isNativePlatform() ? nativeShizuku : webShizuku;
+
+// ── v0.6 Prank ───────────────────────────────────────────────────────────────
+
+export interface PrankClientInfo {
+  ip: string;
+  mac: string;
+  connectedAt: number;
+  loggedIn: boolean;
+  loginAt: number;
+}
+
+export interface PrankState {
+  running: boolean;
+  gatewayIp: string;
+  clients: PrankClientInfo[];
+  authorizedCount: number;
+}
+
+export interface PrankConfig {
+  pageTitle: string;
+  pageSubtitle: string;
+  btnLabel: string;
+  connectingMsg: string;
+  theme: 'red' | 'black' | 'blue';
+}
+
+export interface PrankPlugin {
+  startPrank(o: { config: PrankConfig; fotoUrl: string }): Promise<{ ok: boolean; gatewayIp?: string; message?: string }>;
+  stopPrank(): Promise<{ ok: boolean }>;
+  getPrankState(): Promise<PrankState>;
+  unblockClient(o: { ip: string }): Promise<{ ok: boolean }>;
+  blockClient(o: { ip: string }): Promise<{ ok: boolean }>;
+  updateFoto(o: { fotoUrl: string }): Promise<{ ok: boolean }>;
+  addListener(event: 'prankClient', fn: (c: PrankClientInfo) => void): Promise<{ remove: () => Promise<void> }>;
+}
+
+const nativePrank = registerPlugin<PrankPlugin>('PrankPlugin');
+
+const webPrank: PrankPlugin = {
+  startPrank: async () => ({ ok: false, message: 'Hanya tersedia di Android.' }),
+  stopPrank:  async () => ({ ok: false }),
+  getPrankState: async () => ({ running: false, gatewayIp: '', clients: [], authorizedCount: 0 }),
+  unblockClient: async () => ({ ok: false }),
+  blockClient:   async () => ({ ok: false }),
+  updateFoto:    async () => ({ ok: false }),
+  addListener:   async () => ({ remove: async () => {} }),
+};
+
+export const Prank: PrankPlugin = Capacitor.isNativePlatform() ? nativePrank : webPrank;
