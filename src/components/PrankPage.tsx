@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AlertTriangle, CheckCircle, Clock, RefreshCw,
+  AlertTriangle, CheckCircle, Clock, Copy, RefreshCw,
   Shield, ShieldOff, Skull, Users, Wifi, WifiOff, X,
 } from 'lucide-react';
 import { Header } from './Header';
@@ -57,6 +57,8 @@ export function PrankPage() {
   const [fotoUrl, setFotoUrl] = useState(DEFAULT_FOTO);
   const [state, setState]     = useState<PrankState | null>(null);
   const [busy, setBusy]       = useState(false);
+  const [accessUrl, setAccessUrl] = useState<string | null>(null);
+  const [copied, setCopied]   = useState(false);
   const [log, setLog]         = useState<string[]>([]);
   const [err, setErr]         = useState<string | null>(null);
   const [showCfg, setShowCfg] = useState(false);
@@ -123,12 +125,15 @@ export function PrankPage() {
         addLog('Menghentikan prank...');
         await Prank.stopPrank();
         addLog('Prank dimatikan.');
+        setAccessUrl(null);
         setState((prev) => prev ? { ...prev, running: false, clients: [] } : prev);
       } else {
         addLog('Memulai prank...');
         const r = await Prank.startPrank({ config: cfg, fotoUrl });
         if (r.ok) {
-          addLog(`Prank aktif — gateway ${r.gatewayIp}`);
+          const url = (r as any).accessUrl ?? `http://${r.gatewayIp}:8787/`;
+          setAccessUrl(url);
+          addLog(`Prank aktif — ${url}`);
         } else {
           setErr(r.message ?? 'Gagal');
           addLog(`✗ ${r.message ?? 'Gagal'}`);
@@ -213,6 +218,38 @@ export function PrankPage() {
             </div>
           )}
         </GradCard>
+
+        {/* ── URL share (muncul kalau tidak ada iptables) ── */}
+        {running && accessUrl && accessUrl.includes(':8787') && (
+          <Card>
+            <div className="flex items-center gap-2 mb-2">
+              <Wifi size={18} strokeWidth={2.5} aria-hidden />
+              <h2 className="m-0 text-base font-bold">URL untuk korban</h2>
+            </div>
+            <p className="m-0 mb-3 text-sm opacity-80">
+              HP tidak root — redirect otomatis tidak aktif. Bagikan URL ini ke korban
+              setelah mereka connect ke hotspot.
+            </p>
+            <div
+              className="nb-box bg-deep text-paper px-3 py-3 mb-3 select-all"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', wordBreak: 'break-all' }}
+            >
+              {accessUrl}
+            </div>
+            <Button
+              className="w-full flex items-center justify-center gap-2"
+              onClick={() => {
+                navigator.clipboard.writeText(accessUrl).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }).catch(() => {});
+              }}
+            >
+              <Copy size={16} strokeWidth={2.5} aria-hidden />
+              {copied ? 'Tersalin!' : 'Copy URL'}
+            </Button>
+          </Card>
+        )}
 
         {/* ── client list ── */}
         <Card>

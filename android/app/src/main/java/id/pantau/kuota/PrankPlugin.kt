@@ -82,19 +82,34 @@ class PrankPlugin : Plugin() {
                 server = srv
                 Log.i(TAG, "PrankServer started on :${PrankServer.HTTP_PORT}")
 
-                // 5. apply iptables via Shizuku
-                val iptResult = PrankIptables.apply(ip)
-                if (iptResult.isFailure) {
-                    Log.w(TAG, "iptables partial fail: ${iptResult.exceptionOrNull()?.message}")
+                // 5. cek root dulu sebelum apply iptables
+                val isRooted = checkRoot()
+                var iptablesOk = false
+                if (isRooted) {
+                    val iptResult = PrankIptables.apply(ip)
+                    iptablesOk = iptResult.isSuccess
+                    if (!iptablesOk) {
+                        Log.w(TAG, "iptables partial fail: ${iptResult.exceptionOrNull()?.message}")
+                    }
+                } else {
+                    Log.i(TAG, "HP tidak root — skip iptables, server jalan di port ${PrankServer.HTTP_PORT}")
                 }
 
-                // 6. start hotspot (cmd wifi start-softap via Shizuku, Android 11+)
+                // 6. start hotspot via Shizuku (best-effort)
                 startHotspotViaShizuku()
 
+                val accessUrl = if (iptablesOk) "http://$ip/" else "http://$ip:${PrankServer.HTTP_PORT}/"
                 call.resolve(JSObject()
                     .put("ok", true)
                     .put("gatewayIp", ip)
-                    .put("message", "Prank aktif di $ip:${PrankServer.HTTP_PORT}")
+                    .put("accessUrl", accessUrl)
+                    .put("rooted", isRooted)
+                    .put("iptablesOk", iptablesOk)
+                    .put("message", if (iptablesOk)
+                        "Prank aktif (auto-redirect ON) — $accessUrl"
+                    else
+                        "Prank aktif (no redirect) — bagikan URL: $accessUrl"
+                    )
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "startPrank error", e)
@@ -216,6 +231,17 @@ class PrankPlugin : Plugin() {
             )
         } catch (e: Exception) {
             Log.w(TAG, "emitClientEvent error", e)
+        }
+    }
+
+    private fun checkRoot(): Boolean {
+        return try {
+            val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+            val out = p.inputStream.bufferedReader().readText()
+            p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
+            "uid=0" in out
+        } catch (e: Exception) {
+            false
         }
     }
 
